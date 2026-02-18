@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Laila IA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      background-color: #0f0f0f;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #00ffcc;
+    }
+
+    #chat {
+      margin-top: 20px;
+    }
+
+    input {
+      width: 80%;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      margin-top: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: none;
+      background-color: #00ffcc;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .message {
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Laila IA</h1>
+  <p>Sua IA pessoal</p>
+
+  <div id="chat"></div>
+
+  <input type="text" id="userInput" placeholder="Digite algo..." />
+  <br>
+  <button onclick="responder()">Enviar</button>
+
+  <script>
+    function responder() {
+      let input = document.getElementById("userInput").value;
+      let chat = document.getElementById("chat");
+
+      let userMsg = document.createElement("div");
+      userMsg.className = "message";
+      userMsg.innerHTML = "<b>Você:</b> " + input;
+      chat.appendChild(userMsg);
+
+      let resposta = document.createElement("div");
+      resposta.className = "message";
+      resposta.innerHTML = "<b>Laila:</b> Estou funcionando. Em breve serei muito mais inteligente.";
+      chat.appendChild(resposta);
+
+      document.getElementById("userInput").value = "";
+    }
+  </script>
+
+</body>
+</html>
