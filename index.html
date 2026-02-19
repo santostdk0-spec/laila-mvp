@@ -4,73 +4,49 @@
   <title>Laila IA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      background-color: #0f0f0f;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 20px;
-    }
-
-    h1 {
-      color: #00ffcc;
-    }
-
-    #chat {
-      margin-top: 20px;
-    }
-
-    input {
-      width: 80%;
-      padding: 10px;
-      border-radius: 10px;
-      border: none;
-      margin-top: 10px;
-    }
-
-    button {
-      padding: 10px 20px;
-      border-radius: 10px;
-      border: none;
-      background-color: #00ffcc;
-      font-weight: bold;
-      margin-top: 10px;
-    }
-
-    .message {
-      margin-top: 15px;
-    }
+    body { background:#0a0a0a;color:#fff;font-family:Arial;padding:20px; }
+    h1 { color:#00ffcc; }
+    input { width:70%; padding:10px; border-radius:8px; border:none; }
+    button { padding:10px; border-radius:8px; border:none; background:#00ffcc; font-weight:bold; }
+    #chat { margin-top:20px; }
+    .msg { margin-bottom:10px; padding:10px; border-radius:8px; }
+    .user { background:#222; text-align:right; }
+    .bot { background:#073a34; }
   </style>
 </head>
 <body>
 
-  <h1>Laila IA</h1>
-  <p>Sua IA pessoal</p>
+<h1>LAILA</h1>
 
-  <div id="chat"></div>
+<input id="prompt" type="text" placeholder="Fale com a Laila..." />
+<button onclick="sendMessage()">Enviar</button>
 
-  <input type="text" id="userInput" placeholder="Digite algo..." />
-  <br>
-  <button onclick="responder()">Enviar</button>
+<div id="chat"></div>
 
-  <script>
-    function responder() {
-      let input = document.getElementById("userInput").value;
-      let chat = document.getElementById("chat");
+<script>
+async function sendMessage() {
+  const input = document.getElementById("prompt");
+  const chat = document.getElementById("chat");
+  const text = input.value.trim();
+  if (!text) return;
 
-      let userMsg = document.createElement("div");
-      userMsg.className = "message";
-      userMsg.innerHTML = "<b>Você:</b> " + input;
-      chat.appendChild(userMsg);
+  chat.innerHTML += `<div class="msg user"><b>Você:</b> ${text}</div>`;
+  input.value = "";
 
-      let resposta = document.createElement("div");
-      resposta.className = "message";
-      resposta.innerHTML = "<b>Laila:</b> Estou funcionando. Em breve serei muito mais inteligente.";
-      chat.appendChild(resposta);
+  chat.innerHTML += `<div class="msg bot"><i>Laila está pensando...</i></div>`;
 
-      document.getElementById("userInput").value = "";
-    }
-  </script>
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt: text })
+  });
+
+  const data = await response.json();
+  chat.lastChild.remove();
+
+  chat.innerHTML += `<div class="msg bot"><b>Laila:</b> ${data.text}</div>`;
+}
+</script>
 
 </body>
 </html>
