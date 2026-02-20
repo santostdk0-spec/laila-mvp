@@ -1,52 +1,163 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-  <title>Laila IA</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LAILA — IA</title>
   <style>
-    body { background:#0a0a0a;color:#fff;font-family:Arial;padding:20px; }
-    h1 { color:#00ffcc; }
-    input { width:70%; padding:10px; border-radius:8px; border:none; }
-    button { padding:10px; border-radius:8px; border:none; background:#00ffcc; font-weight:bold; }
-    #chat { margin-top:20px; }
-    .msg { margin-bottom:10px; padding:10px; border-radius:8px; }
-    .user { background:#222; text-align:right; }
-    .bot { background:#073a34; }
+    :root {
+      --bg: #0a0a0a;
+      --accent: #00ffcc;
+      --panel: #071f1a;
+      --user: #111;
+      --text: #ffffff;
+    }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter, Arial, sans-serif}
+    .container{max-width:900px;margin:24px auto;padding:18px}
+    h1{color:var(--accent);margin:0 0 18px 0;font-size:36px}
+    .input-row{display:flex;gap:10px;align-items:center}
+    input[type="text"]{
+      flex:1;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.06);
+      background:#0f0f0f;color:var(--text);font-size:16px;outline:none;
+    }
+    button{padding:11px 16px;border-radius:10px;border:none;background:var(--accent);color:#002022;font-weight:700;cursor:pointer}
+    #chat{margin-top:20px;display:flex;flex-direction:column;gap:12px;max-height:60vh;overflow:auto;padding-right:6px}
+    .msg{padding:12px;border-radius:10px;word-break:break-word;line-height:1.4}
+    .user{align-self:flex-end;background:var(--user);color:var(--text);max-width:100%}
+    .bot{align-self:flex-start;background:var(--panel);color:var(--text);max-width:100%}
+    .meta{font-weight:700;margin-bottom:6px}
+    .thinking{font-style:italic;opacity:0.8}
+    .small{font-size:13px;color:rgba(255,255,255,0.6);margin-top:10px}
   </style>
 </head>
 <body>
+  <div class="container">
+    <h1>LAILA</h1>
 
-<h1>LAILA</h1>
+    <div class="input-row" aria-hidden="false">
+      <input id="prompt" type="text" placeholder="Fale com a Laila..." autocomplete="off" />
+      <button id="sendBtn" aria-label="Enviar">Enviar</button>
+    </div>
 
-<input id="prompt" type="text" placeholder="Fale com a Laila..." />
-<button onclick="sendMessage()">Enviar</button>
+    <div id="chat" role="log" aria-live="polite"></div>
 
-<div id="chat"></div>
+    <div class="small">Dica: escreva algo e pressione Enter ou clique em Enviar.</div>
+  </div>
 
-<script>
-async function sendMessage() {
-  const input = document.getElementById("prompt");
-  const chat = document.getElementById("chat");
-  const text = input.value.trim();
-  if (!text) return;
+  <script>
+    // escapeHtml — evita injeção ao inserir texto na página
+    function escapeHtml(unsafe) {
+      if (unsafe === null || unsafe === undefined) return '';
+      return String(unsafe)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
 
-  chat.innerHTML += `<div class="msg user"><b>Você:</b> ${text}</div>`;
-  input.value = "";
+    // adiciona uma mensagem na UI (tipo: "Você" ou "Laila")
+    function addMessage(who, text, className) {
+      const chat = document.getElementById('chat');
+      const d = document.createElement('div');
+      d.className = 'msg ' + (className || 'bot');
+      d.innerHTML = `<div class="meta">${escapeHtml(who)}:</div><div>${escapeHtml(text)}</div>`;
+      chat.appendChild(d);
+      chat.scrollTop = chat.scrollHeight;
+      return d;
+    }
 
-  chat.innerHTML += `<div class="msg bot"><i>Laila está pensando...</i></div>`;
+    // referência aos elementos
+    const promptEl = document.getElementById('prompt');
+    const sendBtn = document.getElementById('sendBtn');
 
-  const response = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: text })
-  });
+    // enviar ao pressionar Enter
+    promptEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendBtn.click();
+      }
+    });
 
-  const data = await response.json();
-  chat.lastChild.remove();
+    sendBtn.addEventListener('click', sendMessage);
 
-  chat.innerHTML += `<div class="msg bot"><b>Laila:</b> ${data.text}</div>`;
-}
-</script>
+    // função principal: envia mensagem ao backend e trata retorno
+    async function sendMessage() {
+      const text = promptEl.value.trim();
+      if (!text) return;
 
+      // UI: adicionar mensagem do usuário
+      addMessage('Você', text, 'user');
+      promptEl.value = '';
+      promptEl.disabled = true;
+      sendBtn.disabled = true;
+
+      // inserir "pensando" como elemento referenciável
+      const thinking = document.createElement('div');
+      thinking.className = 'msg bot thinking';
+      thinking.textContent = 'Laila está pensando...';
+      document.getElementById('chat').appendChild(thinking);
+      thinking.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+      try {
+        // timeout controlado (25s)
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 25000);
+
+        const resp = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeout);
+
+        // se a resposta não for ok, lemos o texto para debug e mostramos ao usuário
+        if (!resp.ok) {
+          const txt = await resp.text().catch(() => null);
+          thinking.remove();
+          addMessage('Laila', 'Erro na requisição: HTTP ' + resp.status + ' — ' + (txt || 'sem corpo'));
+          console.error('Fetch error status:', resp.status, txt);
+          return;
+        }
+
+        const data = await resp.json().catch((e) => {
+          console.error('Erro ao parsear JSON:', e);
+          return null;
+        });
+
+        console.log('Resposta completa da API:', data);
+
+        thinking.remove();
+
+        // prefer reply (nosso backend), fallback fields (texto bruto) ou mostrar objeto para debug
+        const reply = data && (data.reply ?? data.text ?? (data.output_text || null));
+
+        if (reply) {
+          addMessage('Laila', reply, 'bot');
+        } else {
+          // exibir erro legível para ajudar debugging
+          addMessage('Laila', 'Erro: resposta inesperada da API — veja console para detalhes.', 'bot');
+          console.warn('API response shape unexpected:', data);
+        }
+
+      } catch (err) {
+        thinking.remove();
+        // se foi abort (timeout)
+        if (err.name === 'AbortError') {
+          addMessage('Laila', 'Tempo de resposta excedido. Tente novamente.');
+          console.error('Request aborted (timeout).');
+        } else {
+          addMessage('Laila', 'Erro de conexão: ' + String(err));
+          console.error('Erro na fetch:', err);
+        }
+      } finally {
+        promptEl.disabled = false;
+        sendBtn.disabled = false;
+        promptEl.focus();
+      }
+    }
+  </script>
 </body>
 </html>
