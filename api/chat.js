@@ -1,134 +1,157 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Laila IA</title>
+// api/chat.js
+import fetch from "node-fetch";
+import { createClient } from "@supabase/supabase-js";
 
-<style>
-body {
-  margin: 0;
-  background: #0a0f1c;
-  font-family: 'Segoe UI', sans-serif;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  color: white;
-}
+const OPENAI_KEY = process.env.OPENAI_API_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL || null;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || null;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || null;
+const MEMORY_TABLE = process.env.SUPABASE_MEMORY_TABLE || "memories";
+const MSG_TABLE = process.env.SUPABASE_MSG_TABLE || "messages";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "changeme";
 
-#chat {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-}
+const supabase =
+  SUPABASE_URL &&
+  (SUPABASE_SERVICE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    : createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
 
-.message {
-  padding: 12px 15px;
-  border-radius: 15px;
-  margin-bottom: 10px;
-  max-width: 70%;
-  animation: fadeIn 0.3s ease-in-out;
-}
+const EMB_MODEL = "text-embedding-3-small";
+const RESP_MODEL = "gpt-4.1-mini";
+const TOP_K = 4;
 
-.user {
-  background: #2563eb;
-  align-self: flex-end;
-}
+// ================= EMBEDDING =================
 
-.bot {
-  background: #111827;
-  border: 1px solid #00f7ff;
-  box-shadow: 0 0 10px #00f7ff44;
-  align-self: flex-start;
-}
-
-#inputArea {
-  display: flex;
-  padding: 15px;
-  background: #111827;
-}
-
-input {
-  flex: 1;
-  padding: 12px;
-  border-radius: 10px;
-  border: none;
-  outline: none;
-  background: #1f2937;
-  color: white;
-}
-
-button {
-  margin-left: 10px;
-  padding: 12px 20px;
-  border: none;
-  border-radius: 10px;
-  background: #00f7ff;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-</style>
-</head>
-
-<body>
-
-<div id="chat"></div>
-
-<div id="inputArea">
-  <input id="input" placeholder="Digite sua mensagem..." />
-  <button onclick="sendMessage()">Enviar</button>
-</div>
-
-<script>
-async function sendMessage() {
-  const input = document.getElementById("input");
-  const chat = document.getElementById("chat");
-  const text = input.value;
-  if (!text) return;
-
-  chat.innerHTML += `<div class="message user">${text}</div>`;
-  input.value = "";
-  chat.scrollTop = chat.scrollHeight;
-
-  const loading = document.createElement("div");
-  loading.className = "message bot";
-  loading.innerText = "Digitando...";
-  chat.appendChild(loading);
-  chat.scrollTop = chat.scrollHeight;
-
-  const response = await fetch("/api/chat", {
+async function createEmbedding(text) {
+  const r = await fetch("https://api.openai.com/v1/embeddings", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: text })
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_KEY}`,
+    },
+    body: JSON.stringify({
+      model: EMB_MODEL,
+      input: text,
+    }),
   });
 
-  const data = await response.json();
-
-  loading.remove();
-
-  typeEffect(data.reply, chat);
+  if (!r.ok) throw new Error(await r.text());
+  const j = await r.json();
+  return j.data?.[0]?.embedding ?? null;
 }
 
-function typeEffect(text, chat) {
-  const msg = document.createElement("div");
-  msg.className = "message bot";
-  chat.appendChild(msg);
+// ================= RESPONSES API =================
 
-  let i = 0;
-  const interval = setInterval(() => {
-    msg.innerHTML += text.charAt(i);
-    i++;
-    chat.scrollTop = chat.scrollHeight;
-    if (i >= text.length) clearInterval(interval);
-  }, 20);
+async function callResponsesAPI(payload) {
+  const r = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return await r.json();
 }
-</script>
 
-</body>
-</html>
+function extractReply(data) {
+  if (!data) return null;
+
+  if (typeof data.output_text === "string" && data.output_text.trim())
+    return data.output_text.trim();
+
+  const out0 = data.output?.[0];
+  if (out0?.content) {
+    for (const c of out0.content) {
+      if (c?.type === "output_text" && c?.text) return c.text.trim();
+    }
+  }
+
+  return null;
+}
+
+// ================= HANDLER =================
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    const { message, mode = "reflexiva", persist = true } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "Empty message" });
+    }
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("pt-BR");
+    const timeStr = now.toLocaleTimeString("pt-BR");
+
+    // ===== Buscar memórias =====
+    let memories = [];
+    let embedding = null;
+
+    if (supabase) {
+      embedding = await createEmbedding(message);
+
+      if (embedding) {
+        const rpcResp = await fetch(
+          `${SUPABASE_URL}/rpc/match_memories`,
+          {
+            method: "POST",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${
+                SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY
+              }`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              query_embedding: embedding,
+              match_threshold: 0.0,
+              match_count: TOP_K,
+            }),
+          }
+        );
+
+        if (rpcResp.ok) {
+          memories = await rpcResp.json();
+        }
+      }
+    }
+
+    // ===== Prompt =====
+    const systemPrompt = `
+Você é LAILA, assistente privada e estratégica.
+Modo: ${mode}
+Data atual: ${dateStr}
+Hora atual: ${timeStr}
+`;
+
+    const payload = {
+      model: RESP_MODEL,
+      input: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message },
+      ],
+      max_output_tokens: 700,
+      temperature: 0.3,
+    };
+
+    const openaiData = await callResponsesAPI(payload);
+    const reply = extractReply(openaiData);
+
+    return res.status(200).json({
+      reply: reply || "Erro ao gerar resposta.",
+      retrieved_count: memories.length,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      error: "Server error",
+      detail: String(err),
+    });
+  }
+}
