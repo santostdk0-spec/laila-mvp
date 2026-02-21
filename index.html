@@ -1,182 +1,166 @@
-<!DOCTYPE html>
-<html lang="pt">
+<!doctype html>
+<html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Assistente Virtual LAILA</title>
-  <!-- TailwindCSS via Play CDN (desenvolvimento rápido) -->
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  <!-- Ionicons para ícones -->
-  <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-  <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LAILA — Assistente</title>
+<meta name="theme-color" content="#001f1a" />
+<style>
+  :root{ --bg:#041018; --accent:#00ffd1; --panel:#07221d; --muted:#7b8a86; }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;background:linear-gradient(180deg,#001217 0%,#041018 100%);color:#e6fff9}
+  .app{max-width:920px;margin:12px auto;display:flex;flex-direction:column;height:calc(100vh - 24px);border-radius:12px;overflow:hidden}
+  header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:rgba(0,0,0,0.18);border-bottom:1px solid rgba(255,255,255,0.03)}
+  h1{font-size:20px;margin:0;color:var(--accent);letter-spacing:1px}
+  #chat{flex:1;padding:18px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+  .bubble{padding:12px;border-radius:12px;max-width:78%;line-height:1.4;word-break:break-word}
+  .meta{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .user{align-self:flex-end;background:#0b2035;color:#dff3ff;border:1px solid rgba(255,255,255,0.02)}
+  .bot{align-self:flex-start;background:var(--panel);border:1px solid rgba(0,255,209,0.06);box-shadow:0 6px 22px rgba(0,255,209,0.03)}
+  footer{display:flex;gap:10px;padding:14px;background:rgba(0,0,0,0.12);align-items:center}
+  input[type=text]{flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:#05131a;color:white}
+  button{padding:10px 14px;border-radius:10px;border:none;background:var(--accent);color:#002622;font-weight:700;cursor:pointer}
+  .controls{display:flex;gap:8px;align-items:center}
+  .status{font-size:13px;color:var(--muted);padding-left:8px}
+  .small{font-size:12px;color:var(--muted)}
+  .typing{opacity:0.8;font-style:italic}
+</style>
 </head>
-<body class="bg-black text-white">
-
-  <!-- Fundo animado de partículas (stars) -->
-  <div id="particles-js"></div>
-
-  <!-- Container do chat -->
-  <div class="flex flex-col mx-auto my-8 max-w-md bg-black bg-opacity-50 backdrop-blur-lg rounded-xl shadow-xl border border-purple-800 overflow-hidden">
-    <!-- Cabeçalho do chat -->
-    <header class="py-4 px-6 text-center border-b border-purple-800">
-      <h1 class="text-2xl font-bold text-pink-400 neon-text">LAILA</h1>
+<body>
+  <div class="app">
+    <header>
+      <div style="display:flex;align-items:center;gap:12px">
+        <h1>LAILA</h1>
+        <div class="small">Seu assistente privado</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="status" class="status">Online</div>
+        <div id="mode-pill" class="small">reflexiva</div>
+      </div>
     </header>
-    <!-- Área de mensagens -->
-    <main id="chat-messages" class="flex flex-col p-6 h-80 overflow-y-auto space-y-4">
-      <!-- As mensagens do usuário e da assistente serão inseridas aqui dinamicamente -->
-    </main>
-    <!-- Rodapé com input e botões -->
-    <footer class="py-4 px-6 border-t border-purple-800 flex items-center space-x-4">
-      <!-- Botão de voz -->
-      <button id="voice-button" class="text-blue-400 text-2xl focus:outline-none neon-icon">
-        <ion-icon name="mic-outline"></ion-icon>
-      </button>
-      <!-- Campo de entrada de texto -->
-      <input id="user-input" type="text" placeholder="Digite sua mensagem..." 
-             class="flex-grow px-4 py-2 bg-gray-800 text-white rounded-full focus:outline-none border border-blue-600" />
-      <!-- Botão de enviar -->
-      <button id="send-button" class="text-green-400 text-2xl focus:outline-none neon-icon">
-        <ion-icon name="send-outline"></ion-icon>
-      </button>
+
+    <main id="chat"></main>
+
+    <footer>
+      <div style="display:flex;flex:1;align-items:center;gap:8px">
+        <input id="input" type="text" placeholder="Fale com a Laila..." autocomplete="off" />
+        <select id="mode">
+          <option value="reflexiva">Reflexiva</option>
+          <option value="batalha">Batalha</option>
+          <option value="zueira">Zueira</option>
+        </select>
+        <label class="small"><input id="tts-check" type="checkbox" /> Voz</label>
+      </div>
+      <div>
+        <button id="sendBtn">Enviar</button>
+      </div>
     </footer>
   </div>
 
-  <!-- Áudio de notificação ao enviar -->
-  <audio id="sendSound" src="https://bigsoundbank.com/UPLOAD/mp3/1313.mp3" preload="auto"></audio>
+<script>
+  const chat = document.getElementById('chat');
+  const input = document.getElementById('input');
+  const sendBtn = document.getElementById('sendBtn');
+  const modeSel = document.getElementById('mode');
+  const ttsCheck = document.getElementById('tts-check');
+  const statusEl = document.getElementById('status');
+  const modePill = document.getElementById('mode-pill');
 
-  <!-- Biblioteca de partículas (fundo) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/particlesjs/2.2.3/particles.min.js"></script>
-  <!-- Script principal -->
-  <script>
-    // Configuração das partículas (fundo animado estilo estrelas)
-    particlesJS("particles-js", {
-      "particles": {
-        "number": { "value": 150, "density": { "enable": true, "value_area": 800 } },
-        "color": { "value": "#aaaaaa" },
-        "shape": { "type": "star" },
-        "opacity": { "value": 0.7, "random": true, "anim": { "enable": true, "speed": 0.2, "opacity_min": 0.2 } },
-        "size": { "value": 3, "random": true },
-        "move": { "enable": true, "speed": 0.3, "direction": "none", "random": true, "straight": false, "out_mode": "out" }
-      },
-      "interactivity": {
-        "detect_on": "canvas",
-        "events": { "onhover": { "enable": true, "mode": "bubble" }, "onclick": { "enable": true, "mode": "push" } },
-        "modes": {
-          "bubble": { "distance": 200, "size": 2, "duration": 2, "opacity": 0.8 },
-          "push": { "particles_nb": 4 }
-        }
-      },
-      "retina_detect": true
-    });
+  function escapeHtml(s){ if(s==null) return ""; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
 
-    // Referências a elementos do DOM
-    const chatMessages = document.getElementById("chat-messages");
-    const userInput = document.getElementById("user-input");
-    const sendButton = document.getElementById("send-button");
-    const voiceButton = document.getElementById("voice-button");
-    const sendSound = document.getElementById("sendSound");
+  function addBubble(role, text, meta='') {
+    const d = document.createElement('div');
+    d.className = 'bubble ' + (role==='user' ? 'user' : 'bot');
+    d.innerHTML = (meta ? `<div class="meta">${escapeHtml(meta)}</div>` : '') + `<div class="body">${escapeHtml(text)}</div>`;
+    chat.appendChild(d);
+    chat.scrollTop = chat.scrollHeight;
+    return d;
+  }
 
-    // Função para adicionar mensagem na tela
-    function addMessage(text, fromUser) {
-      const msgElem = document.createElement("p");
-      // Estilo e alinhamento das bolhas de chat
-      if (fromUser) {
-        msgElem.className = "bg-blue-900 bg-opacity-80 text-white px-4 py-2 rounded-2xl self-end animate-fadeIn drop-shadow-xl";
-      } else {
-        msgElem.className = "bg-gray-800 bg-opacity-80 text-white px-4 py-2 rounded-2xl self-start animate-fadeIn drop-shadow-xl";
-      }
-      msgElem.textContent = text;
-      chatMessages.appendChild(msgElem);
-      // Scroll para mostrar a mensagem mais recente
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
+  function typeEffectToElement(el, text, speed=14, onDone) {
+    el.innerHTML = '';
+    let i=0;
+    const timer = setInterval(()=>{
+      el.innerHTML += escapeHtml(text.charAt(i));
+      i++;
+      chat.scrollTop = chat.scrollHeight;
+      if (i >= text.length) { clearInterval(timer); onDone && onDone(); }
+    }, speed);
+  }
 
-    // Função de sintese de voz
-    function speak(text) {
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'pt-BR';
-        speechSynthesis.speak(utterance);
-      }
-    }
+  async function submit(){
+    const text = input.value.trim();
+    if (!text) return;
+    modePill.innerText = modeSel.value;
+    addBubble('user', text, new Date().toLocaleString());
+    input.value = '';
+    statusEl.innerText = 'Laila está pensando...';
 
-    // Função para enviar mensagem do usuário
-    function sendMessage() {
-      const text = userInput.value.trim();
-      if (text === "") return;
-      // Adiciona mensagem do usuário
-      addMessage(text, true);
-      // Toca som de envio
-      sendSound.currentTime = 0;
-      sendSound.play();
-      userInput.value = "";
-      // Simula resposta da LAILA após 1 segundo (substitua aqui pelo fetch ao seu backend)
-      setTimeout(() => {
-        const reply = "LAILA: Você disse \"" + text + "\"";
-        addMessage(reply, false);
-        speak(reply);
-      }, 1000);
-    }
+    // placeholder "typing"
+    const placeholder = document.createElement('div');
+    placeholder.className = 'bubble bot typing';
+    placeholder.innerText = 'Digitando...';
+    chat.appendChild(placeholder);
+    chat.scrollTop = chat.scrollHeight;
 
-    // Envia mensagem ao clicar no botão
-    sendButton.addEventListener("click", sendMessage);
-    // Envia mensagem ao pressionar Enter
-    userInput.addEventListener("keyup", function(e) {
-      if (e.key === "Enter") sendButton.click();
-    });
-
-    // Configuração do reconhecimento de voz
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'pt-BR';
-      recognition.continuous = false;
-      recognition.interimResults = false;
-
-      recognition.onresult = function(event) {
-        const transcript = event.results[0][0].transcript;
-        userInput.value = transcript;
-      };
-      recognition.onerror = function(event) {
-        console.error("Erro no reconhecimento de voz:", event.error);
-      };
-
-      // Ativa o reconhecimento de voz ao clicar no botão de microfone
-      voiceButton.addEventListener("click", () => {
-        recognition.start();
+    try {
+      const resp = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ message: text, mode: modeSel.value, persist: true })
       });
-    } else {
-      // Oculta ou desabilita o botão se não suportado
-      voiceButton.style.display = 'none';
-    }
-  </script>
+      const data = await resp.json();
+      placeholder.remove();
 
-  <!-- Estilos adicionais (pode ser colocado em <style> ou separado) -->
-  <style>
-    /* Animação de fade-in para novas mensagens */
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .animate-fadeIn {
-      animation: fadeIn 0.5s ease-out;
-    }
-    /* Efeito neon no texto do cabeçalho */
-    .neon-text {
-      text-shadow: 0 0 8px #fb07ff, 0 0 16px #fb07ff;
-    }
-    /* Efeito neon nos ícones (usa a cor corrente do texto) */
-    .neon-icon ion-icon {
-      filter: drop-shadow(0 0 4px currentColor);
-    }
-    /* Ajusta z-index do fundo animado para ficar atrás */
-    #particles-js {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      z-index: -1;
-    }
-  </style>
+      if (data?.reply) {
+        const container = document.createElement('div');
+        container.className = 'bubble bot';
+        container.innerHTML = `<div class="meta">${new Date().toLocaleString()}</div><div class="body"></div>`;
+        chat.appendChild(container);
+        chat.scrollTop = chat.scrollHeight;
+        const bodyEl = container.querySelector('.body');
+        typeEffectToElement(bodyEl, data.reply, 12, () => {
+          if (ttsCheck.checked) speak(data.reply);
+        });
 
+        // show small debug info optionally
+        if (data.retrieved_count !== undefined) {
+          const info = document.createElement('div');
+          info.className = 'small';
+          info.style.marginTop = '6px';
+          info.innerText = `Memórias recuperadas: ${data.retrieved_count} • memória salva: ${data.memory_saved ? 'sim' : 'não'}`;
+          chat.appendChild(info);
+        }
+      } else {
+        addBubble('bot', 'Erro: resposta inválida do servidor.');
+        console.warn('debug', data);
+      }
+    } catch (e) {
+      placeholder.remove();
+      addBubble('bot', 'Erro de conexão com o servidor.');
+      console.error(e);
+    } finally {
+      statusEl.innerText = 'Online';
+      input.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+
+  // Web Speech API TTS fallback
+  function speak(text) {
+    if (!('speechSynthesis' in window)) return;
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.lang = 'pt-BR';
+    msg.rate = 1.0;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(msg);
+  }
+
+  // register service worker (optional PWA)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  }
+</script>
 </body>
 </html>
