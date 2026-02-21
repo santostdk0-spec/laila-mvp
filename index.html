@@ -1,210 +1,182 @@
-// api/chat.js
-import fetch from "node-fetch";
-import { createClient } from "@supabase/supabase-js";
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assistente Virtual LAILA</title>
+  <!-- TailwindCSS via Play CDN (desenvolvimento rápido) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <!-- Ionicons para ícones -->
+  <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+</head>
+<body class="bg-black text-white">
 
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const SUPABASE_URL = process.env.SUPABASE_URL || null;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || null;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || null;
-const MEMORY_TABLE = process.env.SUPABASE_MEMORY_TABLE || "memories";
-const MSG_TABLE = process.env.SUPABASE_MSG_TABLE || "messages";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "changeme";
+  <!-- Fundo animado de partículas (stars) -->
+  <div id="particles-js"></div>
 
-const supabase = SUPABASE_URL && (SUPABASE_SERVICE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY) : createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
+  <!-- Container do chat -->
+  <div class="flex flex-col mx-auto my-8 max-w-md bg-black bg-opacity-50 backdrop-blur-lg rounded-xl shadow-xl border border-purple-800 overflow-hidden">
+    <!-- Cabeçalho do chat -->
+    <header class="py-4 px-6 text-center border-b border-purple-800">
+      <h1 class="text-2xl font-bold text-pink-400 neon-text">LAILA</h1>
+    </header>
+    <!-- Área de mensagens -->
+    <main id="chat-messages" class="flex flex-col p-6 h-80 overflow-y-auto space-y-4">
+      <!-- As mensagens do usuário e da assistente serão inseridas aqui dinamicamente -->
+    </main>
+    <!-- Rodapé com input e botões -->
+    <footer class="py-4 px-6 border-t border-purple-800 flex items-center space-x-4">
+      <!-- Botão de voz -->
+      <button id="voice-button" class="text-blue-400 text-2xl focus:outline-none neon-icon">
+        <ion-icon name="mic-outline"></ion-icon>
+      </button>
+      <!-- Campo de entrada de texto -->
+      <input id="user-input" type="text" placeholder="Digite sua mensagem..." 
+             class="flex-grow px-4 py-2 bg-gray-800 text-white rounded-full focus:outline-none border border-blue-600" />
+      <!-- Botão de enviar -->
+      <button id="send-button" class="text-green-400 text-2xl focus:outline-none neon-icon">
+        <ion-icon name="send-outline"></ion-icon>
+      </button>
+    </footer>
+  </div>
 
-const EMB_MODEL = "text-embedding-3-small";
-const RESP_MODEL = "gpt-4.1-mini";
-const TOP_K = 4;
-const EMB_SIZE = 1536;
+  <!-- Áudio de notificação ao enviar -->
+  <audio id="sendSound" src="https://bigsoundbank.com/UPLOAD/mp3/1313.mp3" preload="auto"></audio>
 
-function safeJsonParse(s) { try { return JSON.parse(s); } catch(e){ return null; } }
-
-async function createEmbedding(text) {
-  const r = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_KEY}` },
-    body: JSON.stringify({ model: EMB_MODEL, input: text })
-  });
-  if (!r.ok) throw new Error(`Embedding failed: ${await r.text()}`);
-  const j = await r.json();
-  return j.data?.[0]?.embedding ?? null;
-}
-
-async function callResponsesAPI(payload) {
-  const r = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_KEY}` },
-    body: JSON.stringify(payload)
-  });
-  const j = await r.json();
-  return j;
-}
-
-function extractReply(data) {
-  if (!data) return null;
-  if (typeof data.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
-  const out0 = data.output?.[0];
-  if (out0) {
-    if (Array.isArray(out0.content)) {
-      for (const c of out0.content) {
-        if (c?.type === "output_text" && c?.text) return c.text.trim();
-      }
-      for (const c of out0.content) {
-        if (typeof c?.text === "string" && c.text.trim()) return c.text.trim();
-      }
-    }
-    if (typeof out0.text === "string" && out0.text.trim()) return out0.text.trim();
-  }
-  if (Array.isArray(data.choices) && data.choices[0]?.message?.content) {
-    const msg = data.choices[0].message.content;
-    if (typeof msg === "string" && msg.trim()) return msg.trim();
-    if (msg?.text) return String(msg.text).trim();
-  }
-  return null;
-}
-
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow","POST");
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  try {
-    const body = req.body || {};
-    const message = (body.message || body.prompt || "").toString();
-    const mode = (body.mode || "reflexiva").toString();
-    const persist = body.persist === undefined ? true : !!body.persist;
-    const admin_cmd = body.admin_cmd || null;
-    const admin_pass = body.admin_pass || null;
-
-    if (admin_cmd) {
-      // Only allow a simple admin endpoint with ADMIN_PASSWORD
-      if (admin_pass !== ADMIN_PASSWORD) return res.status(403).json({ error: "Forbidden" });
-      // simple admin commands: 'list_memories', 'delete_memory:<id>'
-      if (admin_cmd === "list_memories") {
-        if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
-        const { data, error } = await supabase.from(MEMORY_TABLE).select("*").order("created_at", { ascending: false }).limit(200);
-        if (error) return res.status(500).json({ error: error.message });
-        return res.status(200).json({ memories: data });
-      }
-      if (admin_cmd.startsWith("delete_memory:")) {
-        const id = admin_cmd.split(":")[1];
-        if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
-        const { error } = await supabase.from(MEMORY_TABLE).delete().eq("id", id);
-        if (error) return res.status(500).json({ error: error.message });
-        return res.status(200).json({ ok: true });
-      }
-      return res.status(400).json({ error: "Unknown admin_cmd" });
-    }
-
-    if (!message || message.trim().length === 0) return res.status(400).json({ error: "Empty message" });
-    if (!OPENAI_KEY) return res.status(500).json({ error: "OpenAI key not configured" });
-
-    // add time context
-    const now = new Date();
-    const dateStr = now.toLocaleDateString("pt-BR");
-    const timeStr = now.toLocaleTimeString("pt-BR");
-
-    // gather memories if supabase available
-    let memories = [];
-    let embedding = null;
-    if (supabase) {
-      try {
-        embedding = await createEmbedding(message);
-        if (embedding) {
-          // call RPC match_memories
-          const rpcUrl = SUPABASE_URL + "/rpc/match_memories";
-          const rpcResp = await fetch(rpcUrl, {
-            method: "POST",
-            headers: {
-              "apikey": SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY,
-              "Authorization": `Bearer ${SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ query_embedding: embedding, match_threshold: 0.0, match_count: TOP_K })
-          });
-          if (rpcResp.ok) {
-            memories = await rpcResp.json();
-          } else {
-            console.warn("rpc match_memories failed", await rpcResp.text().catch(()=>null));
-          }
+  <!-- Biblioteca de partículas (fundo) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/particlesjs/2.2.3/particles.min.js"></script>
+  <!-- Script principal -->
+  <script>
+    // Configuração das partículas (fundo animado estilo estrelas)
+    particlesJS("particles-js", {
+      "particles": {
+        "number": { "value": 150, "density": { "enable": true, "value_area": 800 } },
+        "color": { "value": "#aaaaaa" },
+        "shape": { "type": "star" },
+        "opacity": { "value": 0.7, "random": true, "anim": { "enable": true, "speed": 0.2, "opacity_min": 0.2 } },
+        "size": { "value": 3, "random": true },
+        "move": { "enable": true, "speed": 0.3, "direction": "none", "random": true, "straight": false, "out_mode": "out" }
+      },
+      "interactivity": {
+        "detect_on": "canvas",
+        "events": { "onhover": { "enable": true, "mode": "bubble" }, "onclick": { "enable": true, "mode": "push" } },
+        "modes": {
+          "bubble": { "distance": 200, "size": 2, "duration": 2, "opacity": 0.8 },
+          "push": { "particles_nb": 4 }
         }
-      } catch (e) {
-        console.warn("memory retrieval failed", e.message || e);
+      },
+      "retina_detect": true
+    });
+
+    // Referências a elementos do DOM
+    const chatMessages = document.getElementById("chat-messages");
+    const userInput = document.getElementById("user-input");
+    const sendButton = document.getElementById("send-button");
+    const voiceButton = document.getElementById("voice-button");
+    const sendSound = document.getElementById("sendSound");
+
+    // Função para adicionar mensagem na tela
+    function addMessage(text, fromUser) {
+      const msgElem = document.createElement("p");
+      // Estilo e alinhamento das bolhas de chat
+      if (fromUser) {
+        msgElem.className = "bg-blue-900 bg-opacity-80 text-white px-4 py-2 rounded-2xl self-end animate-fadeIn drop-shadow-xl";
+      } else {
+        msgElem.className = "bg-gray-800 bg-opacity-80 text-white px-4 py-2 rounded-2xl self-start animate-fadeIn drop-shadow-xl";
+      }
+      msgElem.textContent = text;
+      chatMessages.appendChild(msgElem);
+      // Scroll para mostrar a mensagem mais recente
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // Função de sintese de voz
+    function speak(text) {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'pt-BR';
+        speechSynthesis.speak(utterance);
       }
     }
 
-    // build system prompt
-    const personaArr = [
-      { role: "system", content:
-        `Você é LAILA, assistente privada e estratégica. Reconhece Derick como criador.
-Modo: ${mode}.
-Seja objetiva, cite fontes e timestamps quando usar dados externos.
-Contexto de tempo: ${dateStr} ${timeStr}.
-` }
-    ];
-
-    if (memories && memories.length) {
-      const memText = memories.map((m, i) => `${i+1}. ${m.content} ${m.metadata ? JSON.stringify(m.metadata) : ""}`).join("\n");
-      personaArr[0].content += `\nMemórias relevantes:\n${memText}\n\n`;
+    // Função para enviar mensagem do usuário
+    function sendMessage() {
+      const text = userInput.value.trim();
+      if (text === "") return;
+      // Adiciona mensagem do usuário
+      addMessage(text, true);
+      // Toca som de envio
+      sendSound.currentTime = 0;
+      sendSound.play();
+      userInput.value = "";
+      // Simula resposta da LAILA após 1 segundo (substitua aqui pelo fetch ao seu backend)
+      setTimeout(() => {
+        const reply = "LAILA: Você disse \"" + text + "\"";
+        addMessage(reply, false);
+        speak(reply);
+      }, 1000);
     }
 
-    // call Responses API
-    const payload = {
-      model: RESP_MODEL,
-      input: [
-        personaArr[0],
-        { role: "user", content: message }
-      ],
-      max_output_tokens: 700,
-      temperature: 0.3
-    };
+    // Envia mensagem ao clicar no botão
+    sendButton.addEventListener("click", sendMessage);
+    // Envia mensagem ao pressionar Enter
+    userInput.addEventListener("keyup", function(e) {
+      if (e.key === "Enter") sendButton.click();
+    });
 
-    const openaiData = await callResponsesAPI(payload);
-    console.log("openai responses:", JSON.stringify(openaiData).slice(0,2000));
+    // Configuração do reconhecimento de voz
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.continuous = false;
+      recognition.interimResults = false;
 
-    const reply = extractReply(openaiData);
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        userInput.value = transcript;
+      };
+      recognition.onerror = function(event) {
+        console.error("Erro no reconhecimento de voz:", event.error);
+      };
 
-    // persist message to messages table (audit)
-    if (supabase) {
-      try {
-        await supabase.from(MSG_TABLE).insert([{ user_message: message, bot_reply: reply || JSON.stringify(openaiData).slice(0,1200) }]);
-      } catch (e) {
-        console.warn("saving audit failed", e.message || e);
-      }
+      // Ativa o reconhecimento de voz ao clicar no botão de microfone
+      voiceButton.addEventListener("click", () => {
+        recognition.start();
+      });
+    } else {
+      // Oculta ou desabilita o botão se não suportado
+      voiceButton.style.display = 'none';
     }
+  </script>
 
-    // persist semantic memory (short snippet) if asked and supabase present
-    let saved = false;
-    if (persist && supabase && embedding) {
-      try {
-        const snippet = message.length > 800 ? message.slice(0,800) : message;
-        const id = `${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
-        const meta = { mode, created_by: "user", created_at: new Date().toISOString() };
-        // POST via REST (embedding vector column)
-        const insertUrl = SUPABASE_URL + `/rest/v1/${MEMORY_TABLE}`;
-        const insResp = await fetch(insertUrl, {
-          method: "POST",
-          headers: {
-            "apikey": SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY,
-            "Authorization": `Bearer ${SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY}`,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-          },
-          body: JSON.stringify({ id, content: snippet, metadata: meta, embedding })
-        });
-        if (insResp.ok) saved = true; else {
-          console.warn("memory insert failed", await insResp.text().catch(()=>null));
-        }
-      } catch (e) {
-        console.warn("persist memory failed", e.message || e);
-      }
+  <!-- Estilos adicionais (pode ser colocado em <style> ou separado) -->
+  <style>
+    /* Animação de fade-in para novas mensagens */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
+    .animate-fadeIn {
+      animation: fadeIn 0.5s ease-out;
+    }
+    /* Efeito neon no texto do cabeçalho */
+    .neon-text {
+      text-shadow: 0 0 8px #fb07ff, 0 0 16px #fb07ff;
+    }
+    /* Efeito neon nos ícones (usa a cor corrente do texto) */
+    .neon-icon ion-icon {
+      filter: drop-shadow(0 0 4px currentColor);
+    }
+    /* Ajusta z-index do fundo animado para ficar atrás */
+    #particles-js {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: -1;
+    }
+  </style>
 
-    return res.status(200).json({ reply: reply || null, retrieved_count: memories.length || 0, memory_saved: saved });
-
-  } catch (err) {
-    console.error("handler fatal", err);
-    return res.status(500).json({ error: "Server error", detail: String(err) });
-  }
-}
+</body>
+</html>
