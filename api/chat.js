@@ -1,9 +1,7 @@
-import fetch from "node-fetch";
-
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const MODEL = "gpt-4.1-mini";
 
-async function callOpenAI(message) {
+async function callOpenAI(messages) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -12,7 +10,7 @@ async function callOpenAI(message) {
     },
     body: JSON.stringify({
       model: MODEL,
-      input: message,
+      input: messages,
       max_output_tokens: 500,
       temperature: 0.4
     }),
@@ -22,8 +20,7 @@ async function callOpenAI(message) {
 
   if (data.output_text) return data.output_text;
 
-  const text = data.output?.[0]?.content?.[0]?.text;
-  return text || "Erro ao gerar resposta.";
+  return data.output?.[0]?.content?.[0]?.text || "Erro ao gerar resposta.";
 }
 
 export default async function handler(req, res) {
@@ -42,16 +39,15 @@ export default async function handler(req, res) {
     const date = now.toLocaleDateString("pt-BR");
     const time = now.toLocaleTimeString("pt-BR");
 
-    const systemPrompt = `
+    const messages = `
 Você é LAILA, assistente privada criada por Derick.
 Data atual: ${date}
 Hora atual: ${time}
+
+Usuário: ${message}
 `;
 
-    const reply = await callOpenAI([
-      { role: "system", content: systemPrompt },
-      { role: "user", content: message }
-    ]);
+    const reply = await callOpenAI(messages);
 
     return res.status(200).json({ reply });
 
