@@ -1,3 +1,9 @@
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+)
 // api/chat.js - advanced RAG-enabled chat handler for Vercel
 // Requires env:
 // OPENAI_API_KEY (required)
