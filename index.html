@@ -2,231 +2,167 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LAILA — Chat Estratégico</title>
-  <meta name="description" content="Laila — sua extensão estratégica. Chat UI minimalista com modo sombra, espelho brutal e simuladores." />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>LAILA — Chat Android</title>
   <style>
-    :root{
-      --bg:#071025; --card:#0b1220; --muted:#9aa8bf; --accent:#53d4b6; --danger:#ff6b6b;
-      --glass: rgba(255,255,255,0.03); --radius:12px; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-      font-size:15px;
+    :root {
+      --bg: #000000;
+      --bg-card: #121212;
+      --bg-input: #1e1e1e;
+      --text: #e0e0e0;
+      --text-muted: #999999;
+      --accent: #53d4b6;
+      --border: #2a2a2a;
+      --radius: 16px;
+      font-family: "Roboto", sans-serif;
     }
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:linear-gradient(180deg,#031022 0%, #071827 60%);color:#eaf2fb}
-    .app{max-width:980px;margin:18px auto;padding:16px}
-    header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-    .logo{width:58px;height:58px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#4aa1f0);display:flex;align-items:center;justify-content:center;font-weight:700;color:#052233}
-    h1{margin:0;font-size:18px}
-    p.lead{margin:0;color:var(--muted);font-size:13px}
 
-    .main{display:grid;grid-template-columns:1fr 340px;gap:16px}
-    @media(max-width:980px){.main{grid-template-columns:1fr}}
+    *{box-sizing:border-box; margin:0; padding:0;}
 
-    .card{background:var(--card);padding:14px;border-radius:var(--radius);box-shadow:0 6px 18px rgba(2,6,23,0.6)}
-    .chat{display:flex;flex-direction:column;height:66vh;min-height:420px}
-    .messages{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
-    .msg{max-width:78%;padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.02)}
-    .msg.user{align-self:flex-end;background:linear-gradient(180deg, rgba(83,212,182,0.12), rgba(83,212,182,0.06));color:#042226}
-    .msg.ai{align-self:flex-start;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))}
-    .meta{font-size:12px;color:var(--muted);margin-top:6px}
-    .inputArea{display:flex;gap:8px;padding-top:10px}
-    textarea#chatInput{flex:1;min-height:48px;border-radius:10px;padding:10px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:#eaf2fb;resize:none;font-size:15px}
-    button{border:0;border-radius:10px;padding:10px 12px;cursor:pointer}
-    button.primary{background:linear-gradient(180deg,var(--accent),#34c59b);color:#042226;font-weight:600}
-    .tiny{padding:8px 10px;font-size:14px;background:rgba(255,255,255,0.03);color:var(--muted)}
-    .muted{color:var(--muted);font-size:13px}
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+    }
 
-    /* right column */
-    .panel .section{margin-bottom:10px}
-    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
-    select,input[type=text]{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:#eaf2fb;font-size:14px}
-    .small{font-size:13px;color:var(--muted)}
-    .bad{color:var(--danger)}
-    footer{margin-top:12px;text-align:center;color:var(--muted);font-size:12px}
+    body {
+      display: flex;
+      flex-direction: column;
+      font-size: 16px;
+    }
+
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 8px;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .msg {
+      max-width: 75%;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      word-wrap: break-word;
+      line-height: 1.3;
+    }
+
+    .msg.user {
+      background: #2a2a2a;
+      align-self: flex-end;
+      color: var(--text);
+    }
+
+    .msg.ai {
+      background: #1e1e1e;
+      align-self: flex-start;
+      color: var(--text);
+    }
+
+    .msg .meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .input-area {
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+
+    .input-area textarea {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 16px;
+      resize: none;
+      height: 48px;
+    }
+
+    .input-area button {
+      padding: 0 16px;
+      border-radius: var(--radius);
+      border: none;
+      background: var(--accent);
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    @media(max-width:480px){
+      .input-area textarea { font-size:14px; height:42px; }
+      .input-area button { padding:0 12px; font-size:14px; }
+    }
+
   </style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <div class="logo">L</div>
-      <div>
-        <h1>LAILA — Chat Estratégico</h1>
-        <p class="lead">Modo sombra ativo • Espelho brutal disponível • Simuladores integrados</p>
-      </div>
-      <div style="flex:1"></div>
-      <div class="small">Local prototype — sem dados externos</div>
-    </header>
+  <div class="chat-container">
+    <div class="messages" id="messages" role="log" aria-live="polite"></div>
 
-    <main class="main">
-      <!-- chat column -->
-      <section class="card chat" id="chatCard" aria-label="Chat com Laila">
-        <div class="messages" id="messages" role="log" aria-live="polite"></div>
-
-        <div class="inputArea" style="border-top:1px solid rgba(255,255,255,0.02);padding-top:12px">
-          <textarea id="chatInput" placeholder="Pergunte pra Laila... (Ex: 'Devo enviar esse e-mail arriscado?')"></textarea>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            <button class="primary" id="sendBtn">Enviar</button>
-            <button class="tiny" id="quickStrat">Modo Estratégia</button>
-          </div>
-        </div>
-        <div class="meta" style="padding-top:8px">Dica: prefixe com <code>simular:</code> para acionar simulador, ex: <code>simular: conflito com cliente X</code></div>
-      </section>
-
-      <!-- controls column -->
-      <aside class="card panel" aria-label="Controles">
-        <div class="section">
-          <label>Modo Sombra</label>
-          <div style="display:flex;gap:8px;align-items:center">
-            <label><input type="checkbox" id="shadowToggle" checked /> Ativo</label>
-            <div style="flex:1"></div>
-            <button id="reportErrorBtn" class="tiny">Registrar Erro</button>
-          </div>
-        </div>
-
-        <div class="section">
-          <label>Simulador (manual)</label>
-          <select id="simType">
-            <option value="conflict">Conflito</option>
-            <option value="finance">Financeiro</option>
-            <option value="social">Social</option>
-          </select>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button id="runSim" class="tiny">Executar</button>
-            <button id="mirrorBtn" class="tiny">Espelho Brutal</button>
-          </div>
-        </div>
-
-        <div class="section">
-          <label>Relatórios</label>
-          <div style="display:flex;gap:8px">
-            <button id="getReportBtn" class="tiny">Relatório Rápido</button>
-            <button id="clearBtn" class="tiny bad" title="Apaga dados locais">Reset</button>
-          </div>
-        </div>
-
-        <div class="section">
-          <label>Últimos erros relatados</label>
-          <div id="errorsList" class="muted">Nenhum</div>
-        </div>
-      </aside>
-    </main>
-
-    <footer>Arquivos locais — para produção integrar com backend e armazenamento seguro.</footer>
+    <div class="input-area">
+      <textarea id="chatInput" placeholder="Escreva sua mensagem..."></textarea>
+      <button id="sendBtn">Enviar</button>
+    </div>
   </div>
 
 <script>
-  // Lightweight chat client wired to /api/chat
   const messagesEl = document.getElementById('messages');
   const chatInput = document.getElementById('chatInput');
   const sendBtn = document.getElementById('sendBtn');
-  const mirrorBtn = document.getElementById('mirrorBtn');
-  const getReportBtn = document.getElementById('getReportBtn');
-  const runSim = document.getElementById('runSim');
-  const simType = document.getElementById('simType');
-  const quickStrat = document.getElementById('quickStrat');
-  const reportErrorBtn = document.getElementById('reportErrorBtn');
-  const shadowToggle = document.getElementById('shadowToggle');
-  const clearBtn = document.getElementById('clearBtn');
-  const errorsList = document.getElementById('errorsList');
 
-  // state local
-  let shadowEnabled = true;
-  let busy = false;
-  let history = JSON.parse(localStorage.getItem('laila_chat_history') || '[]');
-  let errors = JSON.parse(localStorage.getItem('laila_errors') || '[]');
-  renderHistory(); renderErrors();
-
-  // helpers
   function appendMessage(text, who='ai', meta='') {
-    const el = document.createElement('div'); el.className = 'msg ' + (who==='user' ? 'user' : 'ai');
-    el.innerHTML = `<div>${escapeHtml(text)}</div>${meta?'<div class="meta">'+escapeHtml(meta)+'</div>':''}`;
+    const el = document.createElement('div');
+    el.className = 'msg ' + (who==='user' ? 'user' : 'ai');
+    el.innerHTML = `<div>${escapeHtml(text)}</div>` + (meta?`<div class="meta">${escapeHtml(meta)}</div>`:'');
     messagesEl.appendChild(el);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
-  function setBusy(flag){
-    busy = flag;
-    sendBtn.disabled = flag;
-    quickStrat.disabled = flag;
-    runSim.disabled = flag;
-  }
-  function escapeHtml(s){ return (s+'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":\"&#39;\"})[c]); }
 
-  // chat send
-  async function sendChat(text, extra={}) {
-    if(!text || busy) return;
+  function escapeHtml(s){ return (s+'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c])); }
+
+  async function sendChat(text) {
+    if(!text) return;
     appendMessage(text, 'user');
-    setBusy(true);
+    chatInput.value='';
     try{
-      const payload = { action:'chat', text, shadow:shadowEnabled, simType: extra.simType || null };
-      const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      const j = await r.json();
-      let content = '';
-      if(j?.type === 'chat') content = j.content;
-      else if(j?.type === 'strategy') content = j.mirror ? `Espelho: ${j.mirror}\n\nCenários: ${j.scenarios.map(s=>s.label+': '+Math.round(s.prob*100)+'%').join(' / ')}` : JSON.stringify(j);
-      else if(j?.error) content = 'Erro server: ' + j.error;
-      else content = JSON.stringify(j);
-      appendMessage(content, 'ai');
-      // persist brief history
-      history.push({role:'user',text,ts:Date.now()}); if(history.length>200) history.shift();
-      localStorage.setItem('laila_chat_history', JSON.stringify(history));
-    }catch(err){
-      appendMessage('Erro de conexão: ' + err.message, 'ai');
-    }finally{ setBusy(false); chatInput.value=''; }
+      const res = await fetch('/api/chat',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'chat', text })
+      });
+      const j = await res.json();
+      const reply = j?.content || 'Sem resposta';
+      appendMessage(reply,'ai');
+    }catch(e){
+      appendMessage('Erro: '+e.message,'ai');
+    }
   }
 
-  // quick bindings
   sendBtn.addEventListener('click', ()=> sendChat(chatInput.value.trim()));
-  chatInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendBtn.click(); }});
-  mirrorBtn.addEventListener('click', ()=> {
-    const text = chatInput.value.trim(); if(!text) return alert('Escreva algo primeiro.');
-    // call mirror action
-    sendStrategyMirror(text);
+  chatInput.addEventListener('keydown', e=>{
+    if(e.key==='Enter' && !e.shiftKey){
+      e.preventDefault();
+      sendBtn.click();
+    }
   });
-  quickStrat.addEventListener('click', ()=> {
-    const text = chatInput.value.trim(); if(!text) return alert('Escreva algo primeiro.');
-    sendChat('ESTRATEGIA: ' + text, { simType: null });
-  });
-  runSim.addEventListener('click', ()=> {
-    const text = chatInput.value.trim() || 'sem entrada';
-    sendChat('SIMULAR:'+simType.value+': '+text, { simType: simType.value });
-  });
-  reportErrorBtn.addEventListener('click', ()=> {
-    const desc = prompt('Descreva o erro ocorrido (curto):'); if(!desc) return;
-    errors.push({text:desc,ts:Date.now()}); localStorage.setItem('laila_errors', JSON.stringify(errors)); renderErrors();
-    // send to server too
-    fetch('/api/chat', {method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({action:'reportError', text:desc})});
-    alert('Erro registrado.');
-  });
-  getReportBtn.addEventListener('click', ()=> {
-    sendChat('PEDIR_RELATORIO');
-  });
-  shadowToggle.addEventListener('change', (e)=> { shadowEnabled = e.target.checked; localStorage.setItem('laila_shadow', JSON.stringify(shadowEnabled)); });
-  clearBtn.addEventListener('click', ()=> { if(confirm('Resetar histórico local?')){ localStorage.removeItem('laila_chat_history'); localStorage.removeItem('laila_errors'); history=[]; errors=[]; renderHistory(); renderErrors(); messagesEl.innerHTML=''; appendMessage('Laila online — Modo sombra: '+(shadowEnabled?'Ativo':'Desligado')); } });
 
-  function renderHistory(){
-    // nothing complex: show nothing in left panel, keep chat log persistent only inside messages if desired
-  }
-  function renderErrors(){
-    errorsList.textContent = errors.length ? errors.slice(-6).map(e=> (new Date(e.ts)).toLocaleString() + ' — ' + e.text).join('\n') : 'Nenhum';
-  }
-
-  async function sendStrategyMirror(text){
-    appendMessage(text, 'user');
-    setBusy(true);
-    try{
-      const r = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({action:'mirror', text})});
-      const j = await r.json();
-      const out = (j.ai || j.mirror || JSON.stringify(j));
-      appendMessage(out, 'ai');
-    }catch(e){ appendMessage('Erro: '+e.message,'ai'); }
-    finally{ setBusy(false); chatInput.value=''; }
-  }
-
-  // On load greeting
-  (function(){
-    appendMessage('Laila online — pronto. Pergunte qualquer coisa. (Dica: prefixe com "simular:" para usar simulador.)', 'ai');
-  })();
-
+  // Greeting
+  appendMessage('Laila online — pronta para conversar.','ai');
 </script>
 </body>
 </html>
