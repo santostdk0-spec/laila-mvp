@@ -1,166 +1,418 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>LAILA — Assistente</title>
-<meta name="theme-color" content="#001f1a" />
-<style>
-  :root{ --bg:#041018; --accent:#00ffd1; --panel:#07221d; --muted:#7b8a86; }
-  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;background:linear-gradient(180deg,#001217 0%,#041018 100%);color:#e6fff9}
-  .app{max-width:920px;margin:12px auto;display:flex;flex-direction:column;height:calc(100vh - 24px);border-radius:12px;overflow:hidden}
-  header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:rgba(0,0,0,0.18);border-bottom:1px solid rgba(255,255,255,0.03)}
-  h1{font-size:20px;margin:0;color:var(--accent);letter-spacing:1px}
-  #chat{flex:1;padding:18px;overflow:auto;display:flex;flex-direction:column;gap:12px}
-  .bubble{padding:12px;border-radius:12px;max-width:78%;line-height:1.4;word-break:break-word}
-  .meta{font-size:12px;color:var(--muted);margin-bottom:6px}
-  .user{align-self:flex-end;background:#0b2035;color:#dff3ff;border:1px solid rgba(255,255,255,0.02)}
-  .bot{align-self:flex-start;background:var(--panel);border:1px solid rgba(0,255,209,0.06);box-shadow:0 6px 22px rgba(0,255,209,0.03)}
-  footer{display:flex;gap:10px;padding:14px;background:rgba(0,0,0,0.12);align-items:center}
-  input[type=text]{flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:#05131a;color:white}
-  button{padding:10px 14px;border-radius:10px;border:none;background:var(--accent);color:#002622;font-weight:700;cursor:pointer}
-  .controls{display:flex;gap:8px;align-items:center}
-  .status{font-size:13px;color:var(--muted);padding-left:8px}
-  .small{font-size:12px;color:var(--muted)}
-  .typing{opacity:0.8;font-style:italic}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LAILA — Núcleo Estratégico Completo (index.html)</title>
+  <meta name="description" content="Laila — sua extensão estratégica, ativa manualmente e em modo sombra, espelho brutal e simuladores integrados." />
+  <style>
+    /* Minimal modern UI — neutral palette, clean spacing */
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#6ee7b7; --danger:#ff6b6b; --glass: rgba(255,255,255,0.03);
+      --radius:12px; font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071020 0%, #071827 60%);color:#e6eef6}
+    .app{max-width:1100px;margin:28px auto;padding:20px}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+    .logo{width:72px;height:72px;border-radius:14px;background:linear-gradient(135deg,var(--accent),#60a5fa);display:flex;align-items:center;justify-content:center;font-weight:700;color:#06203a}
+    h1{margin:0;font-size:20px}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+
+    .grid{display:grid;grid-template-columns:340px 1fr;gap:18px}
+
+    .card{background:var(--card);padding:14px;border-radius:var(--radius);box-shadow:0 6px 18px rgba(2,6,23,0.6);}
+    .muted{color:var(--muted);font-size:13px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input[type=text],textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:#e6eef6;font-size:14px}
+    textarea{min-height:84px;resize:vertical}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    button{background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.04);padding:10px 12px;border-radius:10px;color:#e6eef6;cursor:pointer}
+    button.primary{background:linear-gradient(180deg,var(--accent),#3ddc97);color:#06203a;font-weight:600}
+    button.warn{background:linear-gradient(180deg,var(--danger),#ff4757);}
+    .tiny{padding:6px 8px;font-size:13px}
+
+    .status{display:flex;flex-direction:column;gap:8px}
+    .badge{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.03);font-size:13px}
+
+    .panel{display:flex;flex-direction:column;gap:12px}
+    .list{display:flex;flex-direction:column;gap:8px}
+    .list .item{padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.02)}
+    .footer{margin-top:12px;color:var(--muted);font-size:13px}
+
+    .row{display:flex;gap:8px;align-items:center}
+    .spacer{flex:1}
+
+    /* Alerts */
+    .alerts{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow:auto}
+    .alert{padding:10px;border-radius:10px;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-left:4px solid rgba(255,255,255,0.04)}
+    .alert.brutal{border-left-color:var(--danger)}
+    .alert.sugest{border-left-color:var(--accent)}
+
+    /* Simulation result area */
+    .sim{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));}
+
+    footer{margin-top:18px;text-align:center;color:var(--muted);font-size:12px}
+
+    @media(max-width:980px){.grid{grid-template-columns:1fr}}  
+  </style>
 </head>
 <body>
   <div class="app">
     <header>
-      <div style="display:flex;align-items:center;gap:12px">
-        <h1>LAILA</h1>
-        <div class="small">Seu assistente privado</div>
+      <div class="logo">L</div>
+      <div>
+        <h1>LAILA — Núcleo Estratégico Completo</h1>
+        <p class="lead">Ativação manual + modo sombra · Espelho brutal · Simuladores (Conflito / Financeiro / Social)</p>
       </div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <div id="status" class="status">Online</div>
-        <div id="mode-pill" class="small">reflexiva</div>
+      <div class="spacer"></div>
+      <div class="status">
+        <div class="badge" id="shadowStatus">Modo Sombra: <strong id="shadowOn">Ativo</strong></div>
+        <div class="badge">Espelho Brutal: <strong>Habilitado</strong></div>
       </div>
     </header>
 
-    <main id="chat"></main>
+    <main class="grid">
+      <!-- left column: controls -->
+      <section class="card">
+        <div class="panel">
+          <div>
+            <label for="decisionInput">Decisão / Ação (explique breve)</label>
+            <input id="decisionInput" type="text" placeholder="Ex: 'Vou enviar aquele e-mail arriscado pra chefe'" />
+          </div>
+
+          <div class="row">
+            <button class="primary" id="activateBtn">Laila — Modo Estratégia</button>
+            <button class="tiny" id="mirrorBtn">Espelho Brutal</button>
+            <button class="tiny" id="reportErrorBtn">Relatar Erro</button>
+            <button class="tiny" id="getReportBtn">Relatório</button>
+            <div class="spacer"></div>
+            <label style="margin-bottom:0"><input id="shadowToggle" type="checkbox" checked /> Modo Sombra</label>
+          </div>
+
+          <div>
+            <label for="simType">Simulador</label>
+            <select id="simType">
+              <option value="conflict">Simular Conflito</option>
+              <option value="finance">Simular Financeiro</option>
+              <option value="social">Simular Social</option>
+            </select>
+            <div style="margin-top:8px" class="controls">
+              <button id="runSim" class="tiny">Executar Simulação</button>
+              <button id="saveNote" class="tiny">Salvar Observação</button>
+            </div>
+          </div>
+
+          <div>
+            <label for="notes">Notas rápidas / Diário</label>
+            <textarea id="notes" placeholder="Observação rápida — a Laila usa para aprendizado"></textarea>
+            <div class="controls">
+              <button id="saveNotesBtn" class="tiny">Salvar Nota</button>
+              <button id="clearDataBtn" class="tiny warn">Resetar Dados</button>
+            </div>
+          </div>
+
+          <div class="footer">Dica: ative 'Modo Estratégia' apenas quando quiser precisão. O modo sombra observa e aprende silenciosamente.</div>
+        </div>
+      </section>
+
+      <!-- right column: outputs -->
+      <section class="card">
+        <div class="panel">
+          <div>
+            <h3 style="margin:0 0 6px 0">Relatórios & Alertas</h3>
+            <div class="muted">A Laila em modo sombra detecta padrões e gera alertas. Peça um relatório quando quiser.</div>
+          </div>
+
+          <div class="row">
+            <div style="flex:1">
+              <div id="alerts" class="alerts"></div>
+            </div>
+            <div style="width:360px;padding-left:12px">
+              <div style="margin-bottom:10px">
+                <label>Histórico de Erros (relatados)</label>
+                <div id="errorsList" class="list"></div>
+              </div>
+
+              <div>
+                <label>Vulnerabilidades detectadas</label>
+                <div id="vulnList" class="list"></div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 style="margin:8px 0">Resultado da Simulação</h4>
+            <div id="simResult" class="sim muted">Nenhuma simulação executada.</div>
+          </div>
+
+        </div>
+      </section>
+    </main>
 
     <footer>
-      <div style="display:flex;flex:1;align-items:center;gap:8px">
-        <input id="input" type="text" placeholder="Fale com a Laila..." autocomplete="off" />
-        <select id="mode">
-          <option value="reflexiva">Reflexiva</option>
-          <option value="batalha">Batalha</option>
-          <option value="zueira">Zueira</option>
-        </select>
-        <label class="small"><input id="tts-check" type="checkbox" /> Voz</label>
-      </div>
-      <div>
-        <button id="sendBtn">Enviar</button>
-      </div>
+      Arquivo local — abra em navegador moderno. Laila usa heurísticas locais (sem IA externa) para simular comportamento e aprender com seus relatórios.
     </footer>
   </div>
 
-<script>
-  const chat = document.getElementById('chat');
-  const input = document.getElementById('input');
-  const sendBtn = document.getElementById('sendBtn');
-  const modeSel = document.getElementById('mode');
-  const ttsCheck = document.getElementById('tts-check');
-  const statusEl = document.getElementById('status');
-  const modePill = document.getElementById('mode-pill');
+  <script>
+    // Laila — client-only prototype logic
+    const STORAGE_KEY = 'laila_supreme_v1';
+    const ERR_KEY = 'laila_errors_v1';
+    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const errs = JSON.parse(localStorage.getItem(ERR_KEY) || '[]');
 
-  function escapeHtml(s){ if(s==null) return ""; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+    // default structure
+    if(!data.actions) data.actions = [];
+    if(!data.notes) data.notes = [];
+    if(!data.vulns) data.vulns = [];
+    if(!data.shadowEnabled) data.shadowEnabled = true;
 
-  function addBubble(role, text, meta='') {
-    const d = document.createElement('div');
-    d.className = 'bubble ' + (role==='user' ? 'user' : 'bot');
-    d.innerHTML = (meta ? `<div class="meta">${escapeHtml(meta)}</div>` : '') + `<div class="body">${escapeHtml(text)}</div>`;
-    chat.appendChild(d);
-    chat.scrollTop = chat.scrollHeight;
-    return d;
-  }
+    // UI refs
+    const shadowToggle = document.getElementById('shadowToggle');
+    const shadowOn = document.getElementById('shadowOn');
+    const activateBtn = document.getElementById('activateBtn');
+    const mirrorBtn = document.getElementById('mirrorBtn');
+    const reportErrorBtn = document.getElementById('reportErrorBtn');
+    const runSim = document.getElementById('runSim');
+    const simType = document.getElementById('simType');
+    const simResult = document.getElementById('simResult');
+    const alerts = document.getElementById('alerts');
+    const errorsList = document.getElementById('errorsList');
+    const vulnList = document.getElementById('vulnList');
+    const decisionInput = document.getElementById('decisionInput');
+    const notesInput = document.getElementById('notes');
+    const saveNotesBtn = document.getElementById('saveNotesBtn');
+    const saveNoteBtn = document.getElementById('saveNote');
+    const getReportBtn = document.getElementById('getReportBtn');
+    const clearDataBtn = document.getElementById('clearDataBtn');
 
-  function typeEffectToElement(el, text, speed=14, onDone) {
-    el.innerHTML = '';
-    let i=0;
-    const timer = setInterval(()=>{
-      el.innerHTML += escapeHtml(text.charAt(i));
-      i++;
-      chat.scrollTop = chat.scrollHeight;
-      if (i >= text.length) { clearInterval(timer); onDone && onDone(); }
-    }, speed);
-  }
+    shadowToggle.checked = data.shadowEnabled;
+    shadowOn.textContent = data.shadowEnabled ? 'Ativo' : 'Desligado';
 
-  async function submit(){
-    const text = input.value.trim();
-    if (!text) return;
-    modePill.innerText = modeSel.value;
-    addBubble('user', text, new Date().toLocaleString());
-    input.value = '';
-    statusEl.innerText = 'Laila está pensando...';
-
-    // placeholder "typing"
-    const placeholder = document.createElement('div');
-    placeholder.className = 'bubble bot typing';
-    placeholder.innerText = 'Digitando...';
-    chat.appendChild(placeholder);
-    chat.scrollTop = chat.scrollHeight;
-
-    try {
-      const resp = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ message: text, mode: modeSel.value, persist: true })
-      });
-      const data = await resp.json();
-      placeholder.remove();
-
-      if (data?.reply) {
-        const container = document.createElement('div');
-        container.className = 'bubble bot';
-        container.innerHTML = `<div class="meta">${new Date().toLocaleString()}</div><div class="body"></div>`;
-        chat.appendChild(container);
-        chat.scrollTop = chat.scrollHeight;
-        const bodyEl = container.querySelector('.body');
-        typeEffectToElement(bodyEl, data.reply, 12, () => {
-          if (ttsCheck.checked) speak(data.reply);
-        });
-
-        // show small debug info optionally
-        if (data.retrieved_count !== undefined) {
-          const info = document.createElement('div');
-          info.className = 'small';
-          info.style.marginTop = '6px';
-          info.innerText = `Memórias recuperadas: ${data.retrieved_count} • memória salva: ${data.memory_saved ? 'sim' : 'não'}`;
-          chat.appendChild(info);
-        }
-      } else {
-        addBubble('bot', 'Erro: resposta inválida do servidor.');
-        console.warn('debug', data);
-      }
-    } catch (e) {
-      placeholder.remove();
-      addBubble('bot', 'Erro de conexão com o servidor.');
-      console.error(e);
-    } finally {
-      statusEl.innerText = 'Online';
-      input.focus();
+    function persist(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(ERR_KEY, JSON.stringify(errs));
     }
-  }
 
-  sendBtn.addEventListener('click', submit);
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    function pushAlert(text, type){
+      const el = document.createElement('div'); el.className='alert '+(type==='brutal'?'brutal':'sugest');
+      el.textContent = text;
+      alerts.prepend(el);
+      // auto fade after 18s
+      setTimeout(()=>{ if(el.parentNode) el.remove(); }, 18000);
+    }
 
-  // Web Speech API TTS fallback
-  function speak(text) {
-    if (!('speechSynthesis' in window)) return;
-    const msg = new SpeechSynthesisUtterance(text);
-    msg.lang = 'pt-BR';
-    msg.rate = 1.0;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(msg);
-  }
+    function analyzeTextShort(text){
+      // quick heuristics: confidence hints, fatigue hints, repetition
+      const t = text.toLowerCase();
+      const keywordsConf = ['certeza','certezas','confi','confiante','com certeza','tenho certeza','vamo'];
+      const keywordsRisk = ['arrisc','perder','pagar','apostar','apress'];
+      const keywordsEmo = ['raiva','ódio','ódio','ódio','revolt','frustr'];
+      const found = {
+        confidence: keywordsConf.some(k=>t.includes(k)),
+        risk: keywordsRisk.some(k=>t.includes(k)),
+        emotion: keywordsEmo.some(k=>t.includes(k))
+      };
+      return found;
+    }
 
-  // register service worker (optional PWA)
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(()=>{});
-  }
-</script>
+    function detectPatterns(){
+      // simple pattern detector: repeated decisions, many actions in short time
+      const last = data.actions.slice(-6).map(a=>a.text.toLowerCase());
+      const duplicates = last.reduce((acc,t,i,arr)=>{ if(t && arr.indexOf(t)!==i) acc.add(t); return acc }, new Set());
+      if(duplicates.size>0){
+        data.vulns.push({id:Date.now(), type:'Repetição de ação', detail: Array.from(duplicates).slice(0,3), ts:Date.now()});
+        pushAlert('VULNERABILIDADE: Padrão repetido detectado — tendência a confirmar hipóteses.', 'brutal');
+      }
+
+      // fatigue heuristic: many actions in short time
+      const now = Date.now();
+      const recentCount = data.actions.filter(a=> now - a.ts < 1000*60*20).length;
+      if(recentCount>=5){
+        data.vulns.push({id:Date.now(), type:'Fadiga', detail:`${recentCount} ações nos últimos 20min`, ts:Date.now()});
+        pushAlert('ALERTA: Possível fadiga detectada — suas decisões podem ficar enviesadas.', 'sugest');
+      }
+      persist(); renderVulns();
+    }
+
+    function renderErrors(){
+      errorsList.innerHTML='';
+      if(errs.length===0) errorsList.innerHTML='<div class="muted">Nenhum erro relatado.</div>';
+      errs.slice().reverse().forEach(e=>{
+        const it = document.createElement('div'); it.className='item';
+        it.innerHTML = `<strong>${new Date(e.ts).toLocaleString()}</strong><div class="muted" style="margin-top:6px">${e.text}</div>`;
+        errorsList.appendChild(it);
+      });
+    }
+
+    function renderVulns(){
+      vulnList.innerHTML='';
+      if(!data.vulns || data.vulns.length===0) vulnList.innerHTML='<div class="muted">Nenhuma vulnerabilidade detectada.</div>';
+      (data.vulns||[]).slice().reverse().forEach(v=>{
+        const it = document.createElement('div'); it.className='item';
+        it.innerHTML = `<strong>${v.type}</strong><div class="muted" style="margin-top:6px">${Array.isArray(v.detail)?v.detail.join(', '):v.detail}</div>`;
+        vulnList.appendChild(it);
+      });
+    }
+
+    function activateStrategy(){
+      const text = decisionInput.value.trim();
+      if(!text){ pushAlert('Escreva uma decisão ou questão para a Laila analisar.','sugest'); return; }
+      // log action
+      data.actions.push({text,ts:Date.now()}); persist();
+
+      // quick analysis
+      const f = analyzeTextShort(text);
+      // build scenarios A/B/C
+      const scenarioA = {label:'Cenário A (rápido/executar)',prob: f.confidence?0.35:0.6, outcome:'Resultado imediato, sem redundância'};
+      const scenarioB = {label:'Cenário B (aguardar)',prob: 0.35, outcome:'Aguardar 3h - reduzir risco de erro por fadiga'};
+      const scenarioC = {label:'Cenário C (testar)',prob: 0.25, outcome:'Executar um teste controlado para coletar dados'};
+
+      // mirror brutal trigger
+      const mirror = mirrorAssessment(text);
+
+      // adaptative warning if similar error reported before
+      const similarErr = errs.find(e=> text.toLowerCase().includes(e.tag || '') );
+      if(similarErr){
+        pushAlert('ALERTA: Situação similar à um erro já reportado. Considere C ou B.', 'brutal');
+      }
+
+      // render output
+      simResult.innerHTML = `<strong>Análise rápida — Laila (modo estratégia)</strong>
+        <div class="muted" style="margin-top:6px">Entrada: ${escapeHtml(text)}</div>
+        <hr style="opacity:0.06;margin:8px 0" />
+        <div><strong>${scenarioA.label}</strong> — Prob ${Math.round(scenarioA.prob*100)}% — ${scenarioA.outcome}</div>
+        <div><strong>${scenarioB.label}</strong> — Prob ${Math.round(scenarioB.prob*100)}% — ${scenarioB.outcome}</div>
+        <div><strong>${scenarioC.label}</strong> — Prob ${Math.round(scenarioC.prob*100)}% — ${scenarioC.outcome}</div>
+        <hr style="opacity:0.06;margin:8px 0" />
+        <div><strong>Espelho Brutal:</strong> <span style="color:var(--danger)">${escapeHtml(mirror)}</span></div>
+      `;
+
+      // pattern detector after decision
+      if(data.shadowEnabled) detectPatterns();
+    }
+
+    function mirrorAssessment(text){
+      // Brutally honest heuristics
+      const t = text.toLowerCase();
+      if(t.length<12) return 'Frase curta — possível impulso. Elaborar mais antes de agir.';
+      if(t.includes('vou') && t.includes('agora')) return 'Empolgação detectada — reveja timing.';
+      if(t.includes('certo') || t.includes('certeza')) return 'Confiança alta — verifique redundância e vieses. Você tende a confirmar hipóteses já escolhidas.';
+      if(t.includes('arrisc')) return 'Reconhece risco — mas não confunda coragem com planejamento. Teste controlado primeiro.';
+      return 'Análise normal. Cuidado com excesso de otimismo e com subestimação do fator humano.';
+    }
+
+    function runSimulation(type){
+      const input = decisionInput.value.trim();
+      data.actions.push({text:`[SIM ${type}] ${input||'(sem entrada)'} `,ts:Date.now()}); persist();
+      // produce three scenarios with probabilities and suggested steps
+      let out='';
+      if(type==='conflict'){
+        out=`<strong>Simulação de Conflito</strong><div class="muted">Entrada: ${escapeHtml(input||'(vazio)')}</div>
+        <ul>
+          <li><strong>Cenário A (Desescalada)</strong> — prob 48% — Passos: recuar 1 etapa; usar linguagem de baixa carga emocional.</li>
+          <li><strong>Cenário B (Controle de narrativa)</strong> — prob 32% — Passos: consolidar fatos, expor o problema em formato objetivo.</li>
+          <li><strong>Cenário C (Escalada)</strong> — prob 20% — Passos: preparar saída e testemunhas; evitar resposta pública imediata.</li>
+        </ul>`;
+      } else if(type==='finance'){
+        out=`<strong>Simulação Financeira</strong><div class="muted">Entrada: ${escapeHtml(input||'(vazio)')}</div>
+        <ul>
+          <li><strong>Cenário A (Conservador)</strong> — prob 50% — Passos: alocar 30% capital, validar assumptions; horizonte 12+ meses.</li>
+          <li><strong>Cenário B (Moderado)</strong> — prob 30% — Passos: teste com 10% capital; medir sinais de mercado 7–14 dias.</li>
+          <li><strong>Cenário C (Agressivo)</strong> — prob 20% — Passos: não executar sem redundância e stoploss claro.</li>
+        </ul>`;
+      } else {
+        out=`<strong>Simulação Social</strong><div class="muted">Entrada: ${escapeHtml(input||'(vazio)')}</div>
+        <ul>
+          <li><strong>Cenário A (Aliança)</strong> — prob 44% — Passos: identificar 2 aliados, oferecer troca de valor clara.</li>
+          <li><strong>Cenário B (Neutral)</strong> — prob 36% — Passos: preservar informações, medir reações sutis.</li>
+          <li><strong>Cenário C (Hostil)</strong> — prob 20% — Passos: limitar exposição e documentar interações.</li>
+        </ul>`;
+      }
+      simResult.innerHTML = out;
+      if(data.shadowEnabled) detectPatterns();
+    }
+
+    function saveNote(){
+      const t = notesInput.value.trim();
+      if(!t) { pushAlert('Escreva algo antes de salvar.','sugest'); return; }
+      data.notes.push({text:t,ts:Date.now()}); persist(); notesInput.value=''; pushAlert('Nota salva no histórico.','sugest');
+    }
+
+    function reportError(){
+      const text = prompt('Descreva o erro ocorrido (curto):');
+      if(!text) return; const tag = (text.split(' ')[0]||'').toLowerCase();
+      errs.push({text,tag,ts:Date.now()}); persist(); renderErrors(); pushAlert('Erro registrado. Laila integrará ao mapa de vulnerabilidades.','sugest');
+    }
+
+    function getReport(){
+      // produce summary report
+      const totalActions = data.actions.length;
+      const totalErrs = errs.length;
+      const vulnerabilities = data.vulns.length;
+      let body = `<strong>Relatório rápido — Laila (modo sombra)</strong>
+        <div class="muted">Ações registradas: ${totalActions} — Erros relatados: ${totalErrs} — Vulnerabilidades: ${vulnerabilities}</div>
+        <hr style="opacity:0.06;margin:8px 0" />`;
+      if(data.vulns.length>0){
+        body += '<div><strong>Vulnerabilidades recentes:</strong><ul>' + data.vulns.slice().reverse().map(v=>`<li>${escapeHtml(v.type)} — ${escapeHtml(Array.isArray(v.detail)?v.detail.join(', '):v.detail)}</li>`).join('') + '</ul></div>';
+      } else body += '<div class="muted">Nenhuma vulnerabilidade detectada.</div>';
+
+      simResult.innerHTML = body;
+    }
+
+    function escapeHtml(s){ return (s+'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[c]); }
+
+    function clearData(){ if(!confirm('Resetar todos os dados locais da Laila?')) return; localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(ERR_KEY); location.reload(); }
+
+    // event bindings
+    activateBtn.addEventListener('click',()=>activateStrategy());
+    mirrorBtn.addEventListener('click',()=>{
+      const t = decisionInput.value.trim(); if(!t){ pushAlert('Escreva algo antes de pedir espelho.','sugest'); return; }
+      pushAlert('Espelho Brutal gerado. Veja abaixo.','brutal');
+      const m = mirrorAssessment(t);
+      simResult.innerHTML = `<strong>Espelho Brutal</strong><div class="muted" style="margin-top:8px">${escapeHtml(m)}</div>`;
+    });
+    reportErrorBtn.addEventListener('click',()=>reportError());
+    runSim.addEventListener('click',()=>runSimulation(simType.value));
+    saveNotesBtn.addEventListener('click',()=>saveNote());
+    getReportBtn.addEventListener('click',()=>getReport());
+    clearDataBtn.addEventListener('click',()=>clearData());
+
+    shadowToggle.addEventListener('change',(e)=>{
+      data.shadowEnabled = e.target.checked; shadowOn.textContent = data.shadowEnabled? 'Ativo':'Desligado'; persist();
+      pushAlert('Modo Sombra '+(data.shadowEnabled?'ativado':'desligado')+'.','sugest');
+    });
+
+    // shadow background watcher (lightweight) — scans recent actions every 12s
+    setInterval(()=>{
+      if(!data.shadowEnabled) return;
+      // heuristic: many short decisions or similar texts
+      if(data.actions.length===0) return;
+      const last = data.actions.slice(-8);
+      const short = last.filter(a=> (a.text||'').length<30 ).length;
+      if(short>=4) pushAlert('Modo Sombra: Padrão de decisões curtas detectado — possível impulso.', 'sugest');
+
+      // learn from errors (simple): if an error tag exists, check actions containing the tag
+      errs.forEach(e=>{
+        const matches = data.actions.filter(a=> (a.text||'').toLowerCase().includes(e.tag));
+        if(matches.length>=2) pushAlert('Modo Sombra: padrão relacionado ao erro "'+e.tag+'" detectado. Considere relatório.','brutal');
+      });
+
+      detectPatterns();
+    },12000);
+
+    // initial render
+    renderErrors(); renderVulns();
+
+    // quick onboarding helper
+    (function(){
+      if(!localStorage.getItem('laila_seen_welcome')){
+        pushAlert('Bem-vindo: Laila está em Modo Sombra. Use "Modo Estratégia" para análises diretas.', 'sugest');
+        localStorage.setItem('laila_seen_welcome','1');
+      }
+    })();
+
+  </script>
 </body>
 </html>
