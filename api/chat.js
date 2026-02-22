@@ -1,207 +1,267 @@
-// api/chat.js
-import { createClient } from "@supabase/supabase-js";
-
 /*
-  Backend robusto:
-  - usa OpenAI Responses API + Embeddings
-  - opcionalmente consulta e persiste memórias em Supabase
-  - retorna { reply, retrieved_count, memory_saved }
+  api_chat.js — LAILA SUPREME
+  Full, tuned, self-contained Node/Express API for the "Laila" strategic assistant.
+
+  Features:
+  - /api/chat POST endpoint that handles actions: strategy, mirror, simulate, reportError, getReport
+  - Lightweight heuristics (same spirit as index.html) so it works offline without OpenAI
+  - Optional OpenAI integration (set OPENAI_API_KEY) for richer natural-language responses
+  - Simple file-based persistence (data stored in ./data/laila_db.json and ./data/laila_errors.json)
+  - Rate limiting, CORS, basic security headers
+  - Clear JSON responses ready to be consumed by a frontend (like your index.html)
+
+  How to run:
+  1) npm init -y
+  2) npm i express node-fetch express-rate-limit helmet cors
+  3) node api_chat.js
+  4) Server runs on PORT (default 3000)
+
+  Example request:
+    POST http://localhost:3000/api/chat
+    Content-Type: application/json
+    Body: { "action":"strategy", "text":"Vou enviar aquele e-mail arriscado pra chefe" }
 */
 
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const SUPABASE_URL = process.env.SUPABASE_URL || null;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || null;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || null;
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const cors = require('cors');
+const fetch = require('node-fetch');
 
-const MEMORY_TABLE = process.env.SUPABASE_MEMORY_TABLE || "memories";
-const MSG_TABLE = process.env.SUPABASE_MSG_TABLE || "messages";
+// --- Config ---
+const PORT = process.env.PORT || 3000;
+const DB_DIR = path.join(__dirname, 'data');
+const DB_FILE = path.join(DB_DIR, 'laila_db.json');
+const ERR_FILE = path.join(DB_DIR, 'laila_errors.json');
+const OPENAI_KEY = process.env.OPENAI_API_KEY || null; // optional
 
-const RESP_MODEL = "gpt-4.1-mini";
-const EMB_MODEL = "text-embedding-3-small";
-const TOP_K = 4; // quantas memórias recuperar
+// Ensure data folder exists
+if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR);
+if (!fs.existsSync(DB_FILE)) fs.writeFileSync(DB_FILE, JSON.stringify({ actions: [], notes: [], vulns: [], shadowEnabled: true }, null, 2));
+if (!fs.existsSync(ERR_FILE)) fs.writeFileSync(ERR_FILE, JSON.stringify([], null, 2));
 
-const supabase =
-  SUPABASE_URL && (SUPABASE_SERVICE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    : createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
+function readDB() { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}'); }
+function writeDB(obj) { fs.writeFileSync(DB_FILE, JSON.stringify(obj, null, 2)); }
+function readErrors() { return JSON.parse(fs.readFileSync(ERR_FILE, 'utf8') || '[]'); }
+function writeErrors(arr) { fs.writeFileSync(ERR_FILE, JSON.stringify(arr, null, 2)); }
 
-// ---------------- helpers ----------------
+// --- Utilities ---
+function nowTS(){ return Date.now(); }
+function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+function safeStr(s){ return (s||'').toString().trim(); }
 
-async function createEmbedding(text) {
-  const res = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_KEY}`,
-    },
-    body: JSON.stringify({ model: EMB_MODEL, input: text }),
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`Embedding error: ${res.status} ${t}`);
-  }
-  const j = await res.json();
-  return j?.data?.[0]?.embedding ?? null;
+// Simple heuristic analyzer (mirrors index.html heuristics)
+function analyzeTextShort(text){
+  const t = (text||'').toLowerCase();
+  const keywordsConf = ['certeza','certezas','confiante','com certeza','tenho certeza','vamo','vou'];
+  const keywordsRisk = ['arrisc','perder','pagar','apostar','apress','urgente','agora'];
+  const keywordsEmo = ['raiva','ódio','revolt','frustr','fury','hate'];
+  return {
+    confidence: keywordsConf.some(k=>t.includes(k)),
+    risk: keywordsRisk.some(k=>t.includes(k)),
+    emotion: keywordsEmo.some(k=>t.includes(k))
+  };
 }
 
-function extractReplyFromResponses(data) {
-  if (!data) return null;
-  if (typeof data.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
-  const out0 = data.output?.[0];
-  if (out0?.content && Array.isArray(out0.content)) {
-    for (const c of out0.content) {
-      if (c?.type === "output_text" && typeof c?.text === "string" && c.text.trim()) return c.text.trim();
-    }
-    for (const c of out0.content) {
-      if (typeof c?.text === "string" && c.text.trim()) return c.text.trim();
-    }
-  }
-  if (Array.isArray(data.choices) && data.choices[0]?.message?.content) {
-    const msg = data.choices[0].message.content;
-    if (typeof msg === "string" && msg.trim()) return msg.trim();
-    if (msg?.text) return String(msg.text).trim();
-  }
-  return null;
+function mirrorAssessment(text){
+  const t = (text||'').toLowerCase();
+  if(!t) return 'Entrada vazia — descreva claramente o plano antes de executar.';
+  if(t.length < 12) return 'Frase curta — possível impulso. Elaborar mais antes de agir.';
+  if(t.includes('vou') && t.includes('agora')) return 'Empolgação detectada — reveja timing.';
+  if(t.includes('certo') || t.includes('certeza')) return 'Confiança alta — verifique redundância e vieses. Você tende a confirmar hipóteses já escolhidas.';
+  if(t.includes('arrisc')) return 'Reconhece risco — mas não confunda coragem com planejamento. Teste controlado primeiro.';
+  return 'Análise normal. Cuidado com excesso de otimismo e com subestimação do fator humano.';
 }
 
-async function callResponsesAPI(payload) {
-  const r = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_KEY}`,
-    },
-    body: JSON.stringify(payload),
-  });
-  const j = await r.json();
-  return j;
+// Simulators
+function simulateConflict(input){
+  return {
+    title: 'Simulação de Conflito',
+    input,
+    options: [
+      { label:'Desescalada', prob:0.48, steps:['Recuar uma etapa','Usar linguagem de baixa carga emocional','Documentar pontos principais'] },
+      { label:'Controle da narrativa', prob:0.32, steps:['Consolidar fatos','Apresentar em formato objetivo','Alinhar testemunhas'] },
+      { label:'Escalada', prob:0.20, steps:['Preparar saída','Evitar resposta pública imediata','Planejar mitigação'] }
+    ]
+  };
 }
 
-// ---------------- handler ----------------
+function simulateFinance(input){
+  return {
+    title: 'Simulação Financeira',
+    input,
+    options: [
+      { label:'Conservador', prob:0.50, steps:['Alocar 30% capital','Validar assumptions','Horizonte 12+ meses'] },
+      { label:'Moderado', prob:0.30, steps:['Teste com 10% capital','Medir sinais mercado 7-14 dias'] },
+      { label:'Agressivo', prob:0.20, steps:['Não executar sem redundância','Stoploss claro','Revisão de hipóteses'] }
+    ]
+  };
+}
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+function simulateSocial(input){
+  return {
+    title: 'Simulação Social',
+    input,
+    options: [
+      { label:'Aliança', prob:0.44, steps:['Identificar 2 aliados','Oferecer troca de valor clara'] },
+      { label:'Neutro', prob:0.36, steps:['Preservar informações','Medir reações sutis'] },
+      { label:'Hostil', prob:0.20, steps:['Limitar exposição','Documentar interações'] }
+    ]
+  };
+}
 
-  try {
-    const body = req.body || {};
-    const message = (body.message || "").toString();
-    const mode = (body.mode || "reflexiva").toString();
-    const persist = body.persist === undefined ? true : !!body.persist;
-
-    if (!message || message.trim().length === 0) return res.status(400).json({ error: "Empty message" });
-    if (!OPENAI_KEY) return res.status(500).json({ error: "OpenAI key not configured" });
-
-    // add current date/time to prompt (user requested)
-    const now = new Date();
-    const dateStr = now.toLocaleDateString("pt-BR");
-    const timeStr = now.toLocaleTimeString("pt-BR");
-
-    // 1) If Supabase configured, compute embedding + fetch top-K memories (RPC)
-    let memories = [];
-    let embedding = null;
-    if (supabase) {
-      try {
-        embedding = await createEmbedding(message);
-        if (embedding) {
-          // prefer RPC match_memories created in Supabase schema
-          try {
-            const rpcResult = await supabase.rpc("match_memories", {
-              query_embedding: embedding,
-              match_threshold: 0.0,
-              match_count: TOP_K,
-            });
-            // supabase.rpc returns { data, error } shape via client lib, but sometimes returns array directly; normalize:
-            if (rpcResult?.data) memories = rpcResult.data;
-            else if (Array.isArray(rpcResult)) memories = rpcResult;
-            else if (rpcResult) memories = rpcResult;
-          } catch (eRpc) {
-            // fallback: call REST RPC endpoint if needed
-            try {
-              const rpcUrl = `${SUPABASE_URL}/rpc/match_memories`;
-              const fetchRpc = await fetch(rpcUrl, {
-                method: "POST",
-                headers: {
-                  apikey: SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY,
-                  Authorization: `Bearer ${SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ query_embedding: embedding, match_threshold: 0.0, match_count: TOP_K }),
-              });
-              if (fetchRpc.ok) {
-                memories = await fetchRpc.json();
-              }
-            } catch (inner) {
-              console.warn("rpc fallback failed", inner);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("memory retrieval error", e);
-        // continue without memories
-      }
-    }
-
-    // 2) build system prompt including time and top memories
-    let systemContent = `Você é LAILA, assistente privada, estratégica e leal ao seu criador. Modo: ${mode}.\nData: ${dateStr}\nHora: ${timeStr}\nSeja objetivo e cite fontes/timestamps quando usar dados externos.\n`;
-
-    if (Array.isArray(memories) && memories.length > 0) {
-      const memText = memories
-        .map((m, i) => `${i + 1}. ${m.content || m.description || ""}${m.metadata ? ` (meta: ${JSON.stringify(m.metadata)})` : ""}`)
-        .join("\n");
-      systemContent += `\nMemórias relevantes:\n${memText}\n\n`;
-    }
-
-    const payload = {
-      model: RESP_MODEL,
-      input: [
-        { role: "system", content: systemContent },
-        { role: "user", content: message },
-      ],
-      max_output_tokens: 800,
-      temperature: 0.35,
-    };
-
-    // 3) call Responses API
-    const openaiResp = await callResponsesAPI(payload);
-    const reply = extractReplyFromResponses(openaiResp) || null;
-
-    // 4) persist audit message in messages table (if supabase configured)
-    let savedAudit = false;
-    if (supabase) {
-      try {
-        await supabase.from(MSG_TABLE).insert([{ user_message: message, bot_reply: reply || JSON.stringify(openaiResp).slice(0, 1200) }]);
-        savedAudit = true;
-      } catch (e) {
-        console.warn("audit save failed", e);
-      }
-    }
-
-    // 5) persist semantic memory if requested
-    let savedMemory = false;
-    if (persist && supabase && embedding) {
-      try {
-        const snippet = message.length > 800 ? message.slice(0, 800) : message;
-        const id = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-        const meta = { mode, created_by: "user", created_at: new Date().toISOString() };
-        // insert via supabase client (embedding must match column type in schema)
-        const insertResp = await supabase.from(MEMORY_TABLE).insert([{ id, content: snippet, metadata: meta, embedding }]);
-        if (!insertResp.error) savedMemory = true;
-      } catch (e) {
-        console.warn("memory persist failed", e);
-      }
-    }
-
-    return res.status(200).json({
-      reply,
-      retrieved_count: Array.isArray(memories) ? memories.length : 0,
-      memory_saved: savedMemory,
-      audit_saved: savedAudit,
+// Optional OpenAI helper (if key present) — returns null on failure
+async function openaiComplete(prompt){
+  if(!OPENAI_KEY) return null;
+  try{
+    const res = await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+OPENAI_KEY },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages:[{role:'system',content:'You are Laila — concise, brutally honest strategic assistant.'},{role:'user',content:prompt}], max_tokens:450 })
     });
-  } catch (err) {
-    console.error("chat handler error", err);
-    return res.status(500).json({ error: "Server error", detail: String(err) });
+    if(!res.ok) return null;
+    const j = await res.json();
+    // Defensive: ensure structure
+    const txt = j?.choices?.[0]?.message?.content || null;
+    return txt;
+  }catch(err){
+    console.warn('OpenAI call failed', err.message);
+    return null;
   }
 }
+
+// Pattern detection & vulnerability addition
+function detectPatternsAndVulns(db){
+  // repeated recent decisions
+  const last = (db.actions||[]).slice(-6).map(a=> (a.text||'').toLowerCase());
+  const dupSet = last.reduce((acc,t,i,arr)=>{ if(t && arr.indexOf(t)!==i) acc.add(t); return acc; }, new Set());
+  const results = [];
+  if(dupSet.size>0){
+    const vuln = { id: nowTS(), type: 'Repetição de ação', detail: Array.from(dupSet).slice(0,3), ts: nowTS() };
+    db.vulns = db.vulns||[]; db.vulns.push(vuln); results.push(vuln);
+  }
+  // fatigue heuristic
+  const now = nowTS();
+  const recentCount = (db.actions||[]).filter(a=> now - a.ts < 1000*60*20).length;
+  if(recentCount>=5){
+    const vuln = { id: nowTS(), type: 'Fadiga', detail: `${recentCount} ações nos últimos 20min`, ts: nowTS() };
+    db.vulns.push(vuln); results.push(vuln);
+  }
+  return results;
+}
+
+// --- Express app ---
+const app = express();
+app.use(helmet());
+app.use(cors());
+app.use(express.json({ limit: '40kb' }));
+
+const limiter = rateLimit({ windowMs: 1000*20, max: 30 });
+app.use(limiter);
+
+app.get('/', (req,res)=>{
+  res.send('Laila API — alive. Use POST /api/chat');
+});
+
+app.post('/api/chat', async (req,res)=>{
+  try{
+    const { action, text, simType } = req.body || {};
+    const db = readDB();
+    const errors = readErrors();
+
+    // Normalize
+    const cleanText = safeStr(text || '');
+
+    // Store some actions (shadow)
+    if(action === 'strategy' || action === 'simulate' || action === 'mirror'){
+      db.actions = db.actions || [];
+      db.actions.push({ text: cleanText, action, ts: nowTS() });
+      writeDB(db);
+    }
+
+    // Handler switch
+    if(action === 'strategy'){
+      // quick heuristics
+      const f = analyzeTextShort(cleanText);
+      const mirror = mirrorAssessment(cleanText);
+
+      // quick scenarios
+      const scenarioA = { label:'Cenário A (executar)', prob: f.confidence ? 0.35 : 0.6, outcome:'Execução imediata com risco reduzido'};
+      const scenarioB = { label:'Cenário B (aguardar)', prob: 0.35, outcome:'Aguardar 3h para redução de risco por fadiga'};
+      const scenarioC = { label:'Cenário C (testar)', prob: 0.25, outcome:'Teste controlado para coletar dados'};
+
+      // attempt OpenAI augmentation
+      let aiAug = await openaiComplete(`Faça uma resposta curta como Laila: analise: "${cleanText}". Dê 3 cenários e um resumo brutal.`);
+      if(aiAug) {
+        return res.json({ type:'strategy', mirror, scenarios:[scenarioA,scenarioB,scenarioC], ai: aiAug });
+      }
+
+      // fallback
+      return res.json({ type:'strategy', mirror, scenarios:[scenarioA,scenarioB,scenarioC], note:'fallback local heuristics used' });
+    }
+
+    if(action === 'mirror'){
+      const mirror = mirrorAssessment(cleanText);
+      // try AI for richer mirror
+      const aiMirror = await openaiComplete(`Seja brutal e honesto. Avalie a seguinte ação: "${cleanText}". Um parágrafo.`);
+      return res.json({ type:'mirror', mirror, ai: aiMirror || null });
+    }
+
+    if(action === 'simulate'){
+      const type = (simType || 'conflict');
+      let out;
+      if(type === 'conflict') out = simulateConflict(cleanText);
+      else if(type === 'finance') out = simulateFinance(cleanText);
+      else out = simulateSocial(cleanText);
+
+      // AI augmentation optional
+      const aiSim = await openaiComplete(`Simule 3 cenários para o seguinte: "${cleanText}" em contexto ${type}. Dê passos concretos.`);
+      return res.json({ type:'simulate', simType:type, out, ai: aiSim || null });
+    }
+
+    if(action === 'reportError'){
+      // expects text describing the error
+      const tag = (cleanText.split(' ')[0] || '').toLowerCase();
+      const errs = readErrors();
+      const entry = { text: cleanText, tag, ts: nowTS() };
+      errs.push(entry); writeErrors(errs);
+      // integrate quickly into vuln map
+      db.vulns = db.vulns || [];
+      db.vulns.push({ id: nowTS(), type: 'Erro relatado', detail: cleanText, ts: nowTS() });
+      writeDB(db);
+      return res.json({ ok:true, entry });
+    }
+
+    if(action === 'getReport'){
+      // build quick report
+      detectPatternsAndVulns(db);
+      writeDB(db);
+      const totalActions = (db.actions||[]).length;
+      const totalErrs = (readErrors()||[]).length;
+      const vulnerabilities = (db.vulns||[]).length;
+      const report = {
+        totalActions, totalErrs, vulnerabilities,
+        vulnerabilities_list: (db.vulns||[]).slice(-10).reverse(),
+        recent_actions: (db.actions||[]).slice(-8).reverse()
+      };
+      return res.json({ type:'report', report });
+    }
+
+    // Unknown action
+    return res.status(400).json({ error:'unknown action. allowed: strategy, mirror, simulate, reportError, getReport' });
+
+  }catch(err){
+    console.error(err);
+    return res.status(500).json({ error: 'internal_server_error', detail: err.message });
+  }
+});
+
+// small health endpoint
+app.get('/api/health', (req,res)=> res.json({ ok:true, now: nowTS(), openai: !!OPENAI_KEY }));
+
+// start
+app.listen(PORT, ()=>{
+  console.log(`Laila API running on http://localhost:${PORT} — POST /api/chat`);
+});
