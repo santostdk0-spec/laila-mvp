@@ -1,155 +1,65 @@
-<!doctype html>
-<html lang="pt-BR">
+
+<!DOCTYPE html>
+<html lang="pt-br">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>LAILA — Chat (mobile-safe)</title>
-  <style>
-    :root{
-      --bg:#000;
-      --card:#0f0f0f;
-      --input:#171717;
-      --bubble-user:#2b2b2b;
-      --bubble-ai:#141414;
-      --text:#e7e7e7;
-      --muted:#8b8b8b;
-      --accent:#4bb39a;
-      --radius:14px;
-      font-family: Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial;
-    }
-    *{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;background:var(--bg);color:var(--text)}
-    body{display:flex;flex-direction:column;height:100vh}
-    .container{display:flex;flex-direction:column;flex:1;padding:8px}
-    .header{padding:10px 6px;border-bottom:1px solid #0a0a0a;display:flex;align-items:center;gap:12px}
-    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(180deg,var(--accent),#2f9e86);display:flex;align-items:center;justify-content:center;color:#001; font-weight:700}
-    .title{font-size:16px}
-    .messages{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
-    .msg{max-width:78%;padding:10px 12px;border-radius:12px;word-break:break-word;line-height:1.35}
-    .msg.ai{align-self:flex-start;background:var(--bubble-ai);border:1px solid #1a1a1a}
-    .msg.user{align-self:flex-end;background:var(--bubble-user);border:1px solid #222}
-    .meta{font-size:12px;color:var(--muted);margin-top:6px}
-    .input-bar{display:flex;gap:8px;padding:10px;border-top:1px solid #0b0b0b;background:var(--card)}
-    textarea#input{flex:1;border-radius:12px;padding:10px;border:1px solid #232323;background:var(--input);color:var(--text);resize:none;height:50px;font-size:15px}
-    button#send{background:var(--accent);color:#001;border:none;padding:0 16px;border-radius:12px;font-weight:700;cursor:pointer}
-    .status{font-size:13px;color:var(--muted);padding:8px 6px;text-align:center}
-    @media(max-width:460px){
-      .title{font-size:14px}
-      textarea#input{height:46px;font-size:14px}
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Laila IA - Interface</title>
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        
+        .container { text-align: center; position: relative; width: 400px; height: 400px; }
+
+        /* O Cérebro Central */
+        .core {
+            width: 120px; height: 120px; background: linear-gradient(135.21deg, #8A2BE2 0%, #4B0082 100%);
+            border-radius: 30px; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 10px 30px rgba(138, 43, 226, 0.3); z-index: 10;
+        }
+
+        /* Os Agentes Especialistas (Círculo) */
+        .agent {
+            width: 50px; height: 50px; background: white; border-radius: 12px;
+            position: absolute; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); font-size: 20px; transition: 0.3s;
+        }
+
+        .agent:hover { transform: scale(1.2); cursor: pointer; border: 2px solid #8A2BE2; }
+
+        /* Posicionamento Circular (Matemática Pura) */
+        .a1 { top: 0%; left: 50%; transform: translateX(-50%); } /* Planner */
+        .a2 { top: 15%; right: 15%; } /* Search */
+        .a3 { top: 50%; right: 0%; transform: translateY(-50%); } /* Analyst */
+        .a4 { bottom: 15%; right: 15%; } /* Art */
+        .a5 { bottom: 0%; left: 50%; transform: translateX(-50%); } /* Code */
+        .a6 { bottom: 15%; left: 15%; } /* Health */
+        .a7 { top: 50%; left: 0%; transform: translateY(-50%); } /* Law */
+        .a8 { top: 15%; left: 15%; } /* Finance */
+
+        .title { margin-top: 450px; }
+        .title h1 { color: #333; margin: 0; }
+        .title span { color: #8A2BE2; }
+    </style>
 </head>
 <body>
-  <div class="container" role="application" aria-label="Chat Laila">
-    <div class="header">
-      <div class="logo">L</div>
-      <div>
-        <div class="title">LAILA — Chat</div>
-        <div style="font-size:12px;color:var(--muted)">Modo sombra ativo — espelho brutal disponível</div>
-      </div>
+
+    <div class="container">
+        <div class="core">🧠</div>
+
+        <div class="agent a1" title="Planner">🗓️</div>
+        <div class="agent a2" title="Search">🔍</div>
+        <div class="agent a3" title="Analyst">💼</div>
+        <div class="agent a4" title="Art">🎨</div>
+        <div class="agent a5" title="Code">💻</div>
+        <div class="agent a6" title="Health">🏥</div>
+        <div class="agent a7" title="Law">⚖️</div>
+        <div class="agent a8" title="Finance">💰</div>
+
+        <div class="title">
+            <h1>Olá! Sou a <span>Laila IA</span></h1>
+            <p>Inteligência artificial com arquitetura de mente colmeia.</p>
+        </div>
     </div>
 
-    <div id="messages" class="messages" role="log" aria-live="polite"></div>
-
-    <div class="status" id="status">Pronto.</div>
-
-    <div class="input-bar">
-      <textarea id="input" placeholder="Escreva sua mensagem... (ex: 'Devo enviar esse e-mail?')"></textarea>
-      <button id="send">Enviar</button>
-    </div>
-  </div>
-
-<script>
-  const messagesEl = document.getElementById('messages');
-  const inputEl = document.getElementById('input');
-  const sendBtn = document.getElementById('send');
-  const statusEl = document.getElementById('status');
-
-  function escapeHtml(s){ return (s+'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":\"&#39;\"})[c]); }
-
-  function pushMessage(text, who='ai', meta=''){
-    const d = document.createElement('div');
-    d.className = 'msg ' + (who==='user'?'user':'ai');
-    d.innerHTML = `<div>${escapeHtml(text)}</div>${meta?'<div class="meta">'+escapeHtml(meta)+'</div>':''}`;
-    messagesEl.appendChild(d);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-
-  function setStatus(t){ statusEl.textContent = t; }
-
-  async function safeParseResponse(res){
-    // try content-type
-    const ct = res.headers.get('content-type') || '';
-    // if JSON-like type, attempt json
-    if(ct.includes('application/json')){
-      return await res.json();
-    }
-    // otherwise try text and attempt to JSON.parse if looks like JSON
-    const txt = await res.text();
-    try{
-      // quick heuristic: if starts with { or [ try parse
-      const trimmed = txt.trim();
-      if(trimmed.startsWith('{') || trimmed.startsWith('[')) return JSON.parse(trimmed);
-    }catch(e){
-      // swallow
-    }
-    // fallback: return object with rawText so UI can show it
-    return { rawText: txt, _status: res.status, _headers: Object.fromEntries(res.headers.entries()) };
-  }
-
-  async function send(){
-    const text = inputEl.value.trim();
-    if(!text) return;
-    pushMessage(text, 'user');
-    inputEl.value = '';
-    setStatus('Enviando...');
-    sendBtn.disabled = true;
-
-    try{
-      const resp = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ action: 'chat', text })
-      });
-
-      // debug logs in console for inspection
-      console.log('HTTP', resp.status, resp.statusText, Array.from(resp.headers.entries()));
-
-      const data = await safeParseResponse(resp);
-
-      // handle typical shapes
-      if(data && data.type === 'chat' && data.content){
-        pushMessage(String(data.content), 'ai');
-        setStatus('Resposta recebida');
-      } else if(data && data.type === 'strategy' && data.mirror){
-        const out = `Espelho: ${data.mirror}\nCenários: ${data.scenarios ? data.scenarios.map(s=>s.label+': '+Math.round(s.prob*100)+'%').join(' / '):''}`;
-        pushMessage(out,'ai');
-        setStatus('Estratégia sugerida');
-      } else if(data && data.rawText){
-        // server returned plain text (e.g. error or message) — show it
-        pushMessage(String(data.rawText), 'ai', `HTTP ${data._status}`);
-        setStatus('Resposta em texto bruto do servidor');
-        console.warn('Server raw response headers:', data._headers);
-      } else {
-        // generic fallback
-        pushMessage(JSON.stringify(data), 'ai');
-        setStatus('Resposta (formato inesperado)');
-      }
-    }catch(err){
-      console.error('Fetch/parsing error', err);
-      pushMessage('Erro: '+err.message, 'ai');
-      setStatus('Erro na requisição — veja console');
-    }finally{
-      sendBtn.disabled = false;
-    }
-  }
-
-  sendBtn.addEventListener('click', send);
-  inputEl.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }});
-
-  // greeting
-  pushMessage('Laila online — pronta.', 'ai');
-
-</script>
 </body>
 </html>
